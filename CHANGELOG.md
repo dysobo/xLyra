@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.6.0](https://github.com/Yachiyo-5i/xLyra/compare/v1.5.2...v1.6.0) (2026-09-06)
+
+
+### Features
+
+* 🎸 支持为 API 密钥设置计费倍率 ([cc82051](https://github.com/Yachiyo-5i/xLyra/commit/cc820512c18bc1b67cb206b5f17c785a0f1b3884))
+* 🎸 统一数据库迁移执行与版本追踪 ([3f69d42](https://github.com/Yachiyo-5i/xLyra/commit/3f69d42a4b4a4dcf4132c1beeb217dd8660c5e7c))
+* 支持 API 密钥计费倍率 ([86beca8](https://github.com/Yachiyo-5i/xLyra/commit/86beca87a4e6e6473d43a2a6523d39462c4b2521))
+
+
+### Bug Fixes
+
+* 🐛 将 OAuth 刷新并发修复合入主分支 ([b528957](https://github.com/Yachiyo-5i/xLyra/commit/b528957f07790893f6938d190bdcbe47146385e3))
+* 🐛 避免并发 OAuth 刷新失败后重复请求上游 ([854adf7](https://github.com/Yachiyo-5i/xLyra/commit/854adf79160dcbade47fd8395ab444d1fff8b599))
+
+## [1.5.2](https://github.com/Yachiyo-5i/xLyra/compare/v1.5.1...v1.5.2) (2026-09-05)
+
+
+### Bug Fixes
+
+* 🐛 补上 codex OAuth 刷新路径的 gpt-image-2 路由模型 ([20cc6be](https://github.com/Yachiyo-5i/xLyra/commit/20cc6bec92a7fb402eac48f46a5d0a5777d0424d))
+* 🐛 补上 codex OAuth 刷新路径的 gpt-image-2 路由模型 ([be130d9](https://github.com/Yachiyo-5i/xLyra/commit/be130d9830be9645ed09af5cf8653989ecf4a18a))
+
 ## [1.5.1](https://github.com/Yachiyo-5i/xLyra/compare/v1.5.0...v1.5.1) (2026-09-05)
 
 

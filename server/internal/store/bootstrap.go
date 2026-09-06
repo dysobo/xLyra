@@ -101,6 +101,9 @@ func ensureDatabaseInitializedOnce(ctx context.Context, cfg config.Config) error
 		return err
 	}
 	if len(missing) == 0 {
+		if err := runSchemaMigrations(ctx, db); err != nil {
+			return fmt.Errorf("upgrade database schema: %w", err)
+		}
 		return ensureSchemaUpgrades(ctx, db)
 	}
 
@@ -270,6 +273,11 @@ func ensureSchemaUpgrades(ctx context.Context, db *gorm.DB) error {
 	if !migrator.HasColumn(&APIKey{}, "ImageToolBridge") {
 		if err := migrator.AddColumn(&APIKey{}, "ImageToolBridge"); err != nil {
 			return fmt.Errorf("ensure api_keys.image_tool_bridge column: %w", err)
+		}
+	}
+	if !migrator.HasColumn(&APIKey{}, "BillingMultiplier") {
+		if err := migrator.AddColumn(&APIKey{}, "BillingMultiplier"); err != nil {
+			return fmt.Errorf("ensure api_keys.billing_multiplier column: %w", err)
 		}
 	}
 	for _, field := range []string{

@@ -478,6 +478,7 @@ type apiKeyRequest struct {
 	SiteGroupIDs         []string                `json:"site_group_ids"`
 	ModelMappings        []modelRuleRequest      `json:"model_mappings"`
 	ImageToolBridge      *imageToolBridgeRequest `json:"image_tool_bridge"`
+	BillingMultiplier    *float64                `json:"billing_multiplier"`
 	QuotaLimit           *float64                `json:"quota_limit"`
 	QuotaUnlimited       *bool                   `json:"quota_unlimited"`
 	QuotaDailyLimit      *float64                `json:"quota_daily_limit"`
@@ -597,6 +598,7 @@ func apiKeyInputFromRequest(w http.ResponseWriter, r *http.Request, payload apiK
 		SiteGroupIDs:         siteGroupIDs,
 		ModelRules:           authModelRules(payload.ModelMappings),
 		ImageToolBridge:      imageToolBridge,
+		BillingMultiplier:    payload.BillingMultiplier,
 		QuotaLimit:           payload.QuotaLimit,
 		QuotaUnlimited:       quotaUnlimited,
 		QuotaDailyLimit:      payload.QuotaDailyLimit,
@@ -683,6 +685,7 @@ func apiKeyUpdateInputFromRequest(w http.ResponseWriter, r *http.Request, payloa
 		SiteGroupIDs:         siteGroupIDs,
 		ModelRules:           authModelRules(payload.ModelMappings),
 		ImageToolBridge:      imageToolBridge,
+		BillingMultiplier:    payload.BillingMultiplier,
 		QuotaLimit:           quotaLimit,
 		QuotaUnlimited:       quotaUnlimited,
 		QuotaDailyLimit:      dailyLimit,
@@ -778,6 +781,7 @@ func (h Handler) apiKeyPayloadWithRateLimit(item store.APIKey, models []store.AP
 		"site_policy":            item.SitePolicy,
 		"model_mappings":         modelMappingsPayload(item.ModelMappings),
 		"image_tool_bridge":      imageToolBridgePayload(item),
+		"billing_multiplier":     item.BillingMultiplier,
 		"quota_limit":            nullFloat64Value(item.QuotaLimit),
 		"quota_used":             item.QuotaUsed,
 		"quota_total_used":       item.EffectiveTotalQuotaUsed(),
@@ -823,6 +827,7 @@ func (h Handler) apiKeySyncPayload(item store.APIKey) map[string]any {
 		"key_kind":               item.KeyKind,
 		"scope":                  item.Scope,
 		"status":                 item.Status,
+		"billing_multiplier":     item.BillingMultiplier,
 		"quota_limit":            nullFloat64Value(item.QuotaLimit),
 		"quota_used":             item.QuotaUsed,
 		"quota_total_used":       item.EffectiveTotalQuotaUsed(),

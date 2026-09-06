@@ -213,6 +213,12 @@ export function APIKeyFormDraw({
       return
     }
 
+    const parsedBillingMultiplier = parseBillingMultiplier(values.billingMultiplier)
+    if (parsedBillingMultiplier === false) {
+      toast.error(t('form.validation.billingMultiplierInvalid'))
+      return
+    }
+
     const parsedQuotaDailyLimit = parseQuotaLimit(values.quotaDailyLimit)
     const quotaDailyUsed = initialKey?.quota_daily_used ?? 0
     if (parsedQuotaDailyLimit === false) {
@@ -306,6 +312,7 @@ export function APIKeyFormDraw({
       quotaDailyUnlimited: parsedQuotaDailyLimit == null,
       quotaWeeklyLimit: parsedQuotaWeeklyLimit,
       quotaWeeklyUnlimited: parsedQuotaWeeklyLimit == null,
+      billingMultiplier: parsedBillingMultiplier,
       rateLimit: {
         status: values.rateLimitEnabled ? 'enabled' : 'disabled',
         rpm_limit: parsedRPMLimit || null,
@@ -416,6 +423,18 @@ export function APIKeyFormDraw({
           </FormSection>
 
           <FormSection title={t('form.sections.quota')} divided>
+            <FormField
+              label={t('form.fields.billingMultiplier')}
+              description={t('form.fields.billingMultiplierDesc')}
+            >
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={values.billingMultiplier}
+                onChange={(event) => setValues((current) => ({ ...current, billingMultiplier: event.target.value }))}
+                placeholder="1"
+              />
+            </FormField>
             <FormField
               label={t('form.fields.quotaLimit')}
               description={t('form.fields.quotaDesc', { used: initialKey?.quota_total_used ?? initialKey?.quota_used ?? 0 })}
@@ -724,6 +743,14 @@ function parseQuotaLimit(value: string): number | null | false {
   const parsed = Number(trimmed)
   if (!Number.isFinite(parsed) || parsed < 0) return false
   return parsed === 0 ? null : parsed
+}
+
+function parseBillingMultiplier(value: string): number | null | false {
+  const trimmed = value.trim()
+  if (!trimmed) return 1
+  const parsed = Number(trimmed)
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 100) return false
+  return parsed
 }
 
 function FormSection({
