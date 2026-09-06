@@ -49,7 +49,8 @@
     "removeAttachment": "移除附件",
     "attachmentLimit": "最多添加 {{count}} 个附件",
     "attachmentTooLarge": "{{name}} 超过 5 MB",
-    "attachmentReadFailed": "附件读取失败"
+    "attachmentReadFailed": "附件读取失败",
+    "scrollToLatest": "回到最新"
   },
   "image": {
     "modeGeneration": "文生图",
@@ -67,7 +68,8 @@
     "errorGeneric": "生成失败",
     "greeting": "想生成什么图片？",
     "attach": "上传参考图（图生图）",
-    "download": "下载"
+    "download": "下载",
+    "scrollToLatest": "回到最新"
   },
   "actions": {
     "copy": "复制",

@@ -19,6 +19,7 @@ import { attachmentMimeType, normalizeAttachmentDataURL } from '@/features/playg
 import { newId } from '@/features/playground/lib/storage'
 import { RESPONSE_TIMER_TICK_MS } from '@/features/playground/lib/response-timing'
 import { useStickToBottom } from '@/hooks/use-stick-to-bottom'
+import { JumpToLatestButton } from '@/components/common/jump-to-latest-button'
 import { saveChatAttachmentDataAsync } from '@/features/playground/lib/attachment-store'
 import type {
   ChatMessage,
@@ -84,8 +85,7 @@ export function ChatView({
   const abortRef = useRef<AbortController | null>(null)
   const [stopRequested, setStopRequested] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const { handleScroll, scrollToBottom, scrollToBottomIfStuck } = useStickToBottom(scrollRef)
+  const { scrollRef, scrollToBottom, showJump } = useStickToBottom()
 
   const isEmpty = conversation.messages.length === 0
   const runActive = conversation.activeRun?.status === 'queued' || conversation.activeRun?.status === 'running'
@@ -113,9 +113,9 @@ export function ChatView({
     scrollToBottom()
   }, [conversation.id, scrollToBottom])
 
-  useEffect(() => {
-    scrollToBottomIfStuck()
-  }, [conversation.messages, streaming, scrollToBottomIfStuck])
+  // 流式追加的贴底跟随由 useStickToBottom 内的 ResizeObserver 处理：
+  // 高度变化（包括图片/公式加载这类不经 React 状态的异步撑高）自动触发，
+  // 用户滚离阅读时不打扰，无需在这里按 messages 变化逐次驱动
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
@@ -485,23 +485,26 @@ export function ChatView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-          {conversation.messages.map((message) => (
-            <ChatMessageItem
-              key={message.id}
-              message={message}
-              streaming={streaming && message.id === streamingId}
-              streamingElapsedMs={message.id === streamingId ? streamingElapsedMs : null}
-              busy={streaming}
-              canEdit={message.id === lastUserId}
-              isLast={message.id === lastMessageId}
-              gatewayModel={message.model ? modelsById.get(message.model) : undefined}
-              onRegenerate={handleRegenerate}
-              onEditSubmit={handleEditSubmit}
-            />
-          ))}
+      <div className="relative min-h-0 flex-1">
+        <div ref={scrollRef} className="h-full overflow-y-auto">
+          <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+            {conversation.messages.map((message) => (
+              <ChatMessageItem
+                key={message.id}
+                message={message}
+                streaming={streaming && message.id === streamingId}
+                streamingElapsedMs={message.id === streamingId ? streamingElapsedMs : null}
+                busy={streaming}
+                canEdit={message.id === lastUserId}
+                isLast={message.id === lastMessageId}
+                gatewayModel={message.model ? modelsById.get(message.model) : undefined}
+                onRegenerate={handleRegenerate}
+                onEditSubmit={handleEditSubmit}
+              />
+            ))}
+          </div>
         </div>
+        {showJump ? <JumpToLatestButton label={t('chat.scrollToLatest')} onClick={scrollToBottom} /> : null}
       </div>
       <div className="shrink-0 px-4 pb-4">
         <div className="mx-auto max-w-3xl">

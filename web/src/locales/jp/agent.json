@@ -22,7 +22,8 @@
     "editReplayCancel": "キャンセル",
     "editReplayConfirm": "再生成",
     "compactNoSession": "圧縮する会話を開いてください",
-    "compactFailed": "圧縮に失敗しました"
+    "compactFailed": "圧縮に失敗しました",
+    "scrollToLatest": "最新へ戻る"
   },
   "composer": {
     "permissionMode": "権限モード",

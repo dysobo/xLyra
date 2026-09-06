@@ -22,7 +22,8 @@
     "editReplayCancel": "取消",
     "editReplayConfirm": "重新生成",
     "compactNoSession": "请先进入一个会话再执行压缩",
-    "compactFailed": "压缩失败"
+    "compactFailed": "压缩失败",
+    "scrollToLatest": "回到最新"
   },
   "composer": {
     "permissionMode": "权限模式",

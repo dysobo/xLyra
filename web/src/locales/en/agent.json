@@ -22,7 +22,8 @@
     "editReplayCancel": "Cancel",
     "editReplayConfirm": "Regenerate",
     "compactNoSession": "Open a session before compacting",
-    "compactFailed": "Compaction failed"
+    "compactFailed": "Compaction failed",
+    "scrollToLatest": "Jump to latest"
   },
   "composer": {
     "permissionMode": "Permission mode",

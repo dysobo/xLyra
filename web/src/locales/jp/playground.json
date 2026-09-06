@@ -49,7 +49,8 @@
     "removeAttachment": "添付ファイルを削除",
     "attachmentLimit": "添付できるファイルは最大 {{count}} 件です",
     "attachmentTooLarge": "{{name}} は 5 MB を超えています",
-    "attachmentReadFailed": "添付ファイルを読み込めませんでした"
+    "attachmentReadFailed": "添付ファイルを読み込めませんでした",
+    "scrollToLatest": "最新へ戻る"
   },
   "image": {
     "modeGeneration": "生成",
@@ -67,7 +68,8 @@
     "errorGeneric": "生成に失敗しました",
     "greeting": "どんな画像を作りますか？",
     "attach": "参照画像を添付（編集）",
-    "download": "ダウンロード"
+    "download": "ダウンロード",
+    "scrollToLatest": "最新へ戻る"
   },
   "actions": {
     "copy": "コピー",

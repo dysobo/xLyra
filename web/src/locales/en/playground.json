@@ -49,7 +49,8 @@
     "removeAttachment": "Remove attachment",
     "attachmentLimit": "You can attach up to {{count}} files",
     "attachmentTooLarge": "{{name}} exceeds 5 MB",
-    "attachmentReadFailed": "Failed to read attachment"
+    "attachmentReadFailed": "Failed to read attachment",
+    "scrollToLatest": "Jump to latest"
   },
   "image": {
     "modeGeneration": "Generate",
@@ -67,7 +68,8 @@
     "errorGeneric": "Generation failed",
     "greeting": "What image should I create?",
     "attach": "Attach reference image (edit)",
-    "download": "Download"
+    "download": "Download",
+    "scrollToLatest": "Jump to latest"
   },
   "actions": {
     "copy": "Copy",

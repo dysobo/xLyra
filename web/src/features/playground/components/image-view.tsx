@@ -30,6 +30,7 @@ import {
   responseTimestamp,
 } from '@/features/playground/lib/response-timing'
 import { useStickToBottom } from '@/hooks/use-stick-to-bottom'
+import { JumpToLatestButton } from '@/components/common/jump-to-latest-button'
 import type { GatewayModel, ImageConversation, ImageHistoryEntry } from '@/features/playground/lib/types'
 
 type ImageViewProps = {
@@ -136,8 +137,7 @@ export function ImageView({
   const [stopRequested, setStopRequested] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef<AbortController | null>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const { handleScroll, scrollToBottom, scrollToBottomIfStuck } = useStickToBottom(scrollRef)
+  const { scrollRef, scrollToBottom, showJump } = useStickToBottom()
 
   const isEmpty = conversation.entries.length === 0
   const runActive = conversation.activeRun?.status === 'queued' || conversation.activeRun?.status === 'running'
@@ -165,9 +165,8 @@ export function ImageView({
     scrollToBottom()
   }, [conversation.id, scrollToBottom])
 
-  useEffect(() => {
-    scrollToBottomIfStuck()
-  }, [conversation.entries, submitting, scrollToBottomIfStuck])
+  // 生成过程中的贴底跟随由 useStickToBottom 内的 ResizeObserver 处理，
+  // 用户滚离阅读时不打扰，无需在这里按 entries 变化逐次驱动
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
@@ -621,123 +620,126 @@ export function ImageView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-          {conversation.entries.map((entry, index) => {
-            const isLast = index === conversation.entries.length - 1
-            const editing = editingEntryId === entry.id
-            const entryModel = modelsById.get(entry.model)
-            const responseDuration = entry.responseDurationMs === undefined
-              ? null
-              : formatResponseDuration(entry.responseDurationMs)
-            const liveDuration = entry.id === submittingEntryId && submittingElapsedMs !== null
-              ? formatResponseDuration(submittingElapsedMs)
-              : null
-            const displayedDuration = entry.pending ? liveDuration : responseDuration
-            return (
-              <div key={entry.id} className="space-y-2">
-                <div className="group flex flex-col items-end gap-1">
-                  {entry.mode === 'edit' && entry.sourceImages?.length ? (
-                    <div className="flex max-w-[80%] flex-wrap justify-end gap-2">
-                      {entry.sourceImages.map((source, sourceIndex) => (
-                        <button
-                          key={`${entry.id}-source-${sourceIndex}`}
-                          type="button"
-                          onClick={() => setLightbox(source)}
-                          className="block overflow-hidden rounded-xl border border-[hsl(var(--glass-border))] transition-transform hover:scale-[1.01]"
-                        >
-                          <img
-                            src={source}
-                            alt={entry.prompt}
-                            className="h-20 w-20 object-cover md:h-24 md:w-24"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                  {editing ? (
-                    <div className="w-full max-w-[80%] space-y-2">
-                      <TextArea
-                        value={editDraft}
-                        onChange={(event) => setEditDraft(event.target.value)}
-                        className="min-h-[72px]"
-                      />
-                      <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setEditingEntryId(null)}>
-                          {t('actions.cancel')}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={!editDraft.trim() || submitting}
-                          onClick={() => void handleRetryEntry(entry, editDraft)}
-                        >
-                          {t('actions.send')}
-                        </Button>
+      <div className="relative min-h-0 flex-1">
+        <div ref={scrollRef} className="h-full overflow-y-auto">
+          <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+            {conversation.entries.map((entry, index) => {
+              const isLast = index === conversation.entries.length - 1
+              const editing = editingEntryId === entry.id
+              const entryModel = modelsById.get(entry.model)
+              const responseDuration = entry.responseDurationMs === undefined
+                ? null
+                : formatResponseDuration(entry.responseDurationMs)
+              const liveDuration = entry.id === submittingEntryId && submittingElapsedMs !== null
+                ? formatResponseDuration(submittingElapsedMs)
+                : null
+              const displayedDuration = entry.pending ? liveDuration : responseDuration
+              return (
+                <div key={entry.id} className="space-y-2">
+                  <div className="group flex flex-col items-end gap-1">
+                    {entry.mode === 'edit' && entry.sourceImages?.length ? (
+                      <div className="flex max-w-[80%] flex-wrap justify-end gap-2">
+                        {entry.sourceImages.map((source, sourceIndex) => (
+                          <button
+                            key={`${entry.id}-source-${sourceIndex}`}
+                            type="button"
+                            onClick={() => setLightbox(source)}
+                            className="block overflow-hidden rounded-xl border border-[hsl(var(--glass-border))] transition-transform hover:scale-[1.01]"
+                          >
+                            <img
+                              src={source}
+                              alt={entry.prompt}
+                              className="h-20 w-20 object-cover md:h-24 md:w-24"
+                            />
+                          </button>
+                        ))}
                       </div>
-                    </div>
-                  ) : (
-                    <CollapsibleUserMessage content={entry.prompt} />
-                  )}
-                  {!editing ? (
-                    <div className="flex items-center gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-                      <PlaygroundMessageAction
-                        label={t('actions.copy')}
-                        onClick={() =>
-                          void copyToClipboard(entry.prompt, t('actions.copied'), t('actions.copyFailed'))
-                        }
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </PlaygroundMessageAction>
-                      {isLast ? (
-                        <PlaygroundMessageAction
-                          label={t('actions.edit')}
-                          onClick={() => {
-                            setEditDraft(entry.prompt)
-                            setEditingEntryId(entry.id)
-                          }}
-                          disabled={submitting}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </PlaygroundMessageAction>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-                {renderImages(entry)}
-                <div className="flex items-center gap-2">
-                  {isLast && !entry.pending ? (
-                    <PlaygroundRegenerateAction
-                      label={t('actions.regenerate')}
-                      message={t('confirm.regenerateImage')}
-                      disabled={submitting}
-                      onConfirm={() => void handleRetryEntry(entry)}
-                    />
-                  ) : null}
-                  <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-faint">
-                    <PlaygroundModelIcon
-                      modelId={entry.model}
-                      displayName={entryModel?.displayName}
-                      ownedBy={entryModel?.ownedBy}
-                    />
-                    <span className="truncate">{entry.model}</span>
-                    {entry.siteName ? <span>|</span> : null}
-                    {entry.siteName ? <span className="truncate">{entry.siteName}</span> : null}
-                    {displayedDuration ? <span>·</span> : null}
-                    {displayedDuration ? (
-                      <span className="whitespace-nowrap tabular-nums">
-                        {t(entry.pending ? 'image.elapsedDuration' : 'image.responseDuration', {
-                          duration: displayedDuration,
-                        })}
-                      </span>
                     ) : null}
-                    {entry.size && entry.size !== 'auto' ? <span>· {entry.size}</span> : null}
+                    {editing ? (
+                      <div className="w-full max-w-[80%] space-y-2">
+                        <TextArea
+                          value={editDraft}
+                          onChange={(event) => setEditDraft(event.target.value)}
+                          className="min-h-[72px]"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setEditingEntryId(null)}>
+                            {t('actions.cancel')}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={!editDraft.trim() || submitting}
+                            onClick={() => void handleRetryEntry(entry, editDraft)}
+                          >
+                            {t('actions.send')}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <CollapsibleUserMessage content={entry.prompt} />
+                    )}
+                    {!editing ? (
+                      <div className="flex items-center gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                        <PlaygroundMessageAction
+                          label={t('actions.copy')}
+                          onClick={() =>
+                            void copyToClipboard(entry.prompt, t('actions.copied'), t('actions.copyFailed'))
+                          }
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </PlaygroundMessageAction>
+                        {isLast ? (
+                          <PlaygroundMessageAction
+                            label={t('actions.edit')}
+                            onClick={() => {
+                              setEditDraft(entry.prompt)
+                              setEditingEntryId(entry.id)
+                            }}
+                            disabled={submitting}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </PlaygroundMessageAction>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                  {renderImages(entry)}
+                  <div className="flex items-center gap-2">
+                    {isLast && !entry.pending ? (
+                      <PlaygroundRegenerateAction
+                        label={t('actions.regenerate')}
+                        message={t('confirm.regenerateImage')}
+                        disabled={submitting}
+                        onConfirm={() => void handleRetryEntry(entry)}
+                      />
+                    ) : null}
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-faint">
+                      <PlaygroundModelIcon
+                        modelId={entry.model}
+                        displayName={entryModel?.displayName}
+                        ownedBy={entryModel?.ownedBy}
+                      />
+                      <span className="truncate">{entry.model}</span>
+                      {entry.siteName ? <span>|</span> : null}
+                      {entry.siteName ? <span className="truncate">{entry.siteName}</span> : null}
+                      {displayedDuration ? <span>·</span> : null}
+                      {displayedDuration ? (
+                        <span className="whitespace-nowrap tabular-nums">
+                          {t(entry.pending ? 'image.elapsedDuration' : 'image.responseDuration', {
+                            duration: displayedDuration,
+                          })}
+                        </span>
+                      ) : null}
+                      {entry.size && entry.size !== 'auto' ? <span>· {entry.size}</span> : null}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
+        {showJump ? <JumpToLatestButton label={t('image.scrollToLatest')} onClick={scrollToBottom} /> : null}
       </div>
       <div className="shrink-0 px-4 pb-4">
         <div className="mx-auto max-w-3xl">

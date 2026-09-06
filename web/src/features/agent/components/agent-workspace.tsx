@@ -16,6 +16,8 @@ import { AgentSettingsDialog } from '@/features/agent/components/agent-settings-
 import { AgentTimeline } from '@/features/agent/components/agent-timeline'
 import { Button } from '@/components/ui/button'
 import { AppLogo } from '@/components/common/app-logo'
+import { JumpToLatestButton } from '@/components/common/jump-to-latest-button'
+import { useStickToBottom } from '@/hooks/use-stick-to-bottom'
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AgentLiquidGlassPanel, type AgentLiquidGlassSettings } from '@/features/agent/components/liquid-glass/agent-liquid-glass'
 import { agentDialogGlassDefaults } from '@/features/agent/components/agent-dialog-material'
@@ -298,10 +300,9 @@ export function AgentWorkspace() {
   // skip the reload that follows so the optimistically appended timeline survives.
   const skipTranscriptLoadFor = useRef<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  // 主动进入会话（打开历史会话 / 发送 / 重放编辑）时置位，让 scroll 效果在内容就绪后
-  // 一次性跳到最底部看最新消息；跳完即清，流式追加仍走「贴底跟随」逻辑，不打扰用户阅读
-  const revealLatestRef = useRef(false)
+  // 流式贴底跟随：贴底时内容增长自动滚到底，用户滚离阅读时静默不打扰；
+  // 打开历史会话 / 发送 / 重放编辑时调用 scrollToBottom 强制跳到底部看最新
+  const { scrollRef, scrollToBottom, showJump } = useStickToBottom()
 
   const sessions = sessionsQuery.data ?? []
   // Stay on the new-chat screen by default; only an explicit selection enters a session.
@@ -554,28 +555,14 @@ export function AgentWorkspace() {
   const waitingReply = awaiting && (!lastItem || lastItem.kind === 'user' || Boolean(runNeedsIndicator))
   const waitingOrbState = lastItem?.kind === 'run' ? orbStateForRun(lastItem.run) : 'breathing'
 
-  useEffect(() => {
-    const container = scrollRef.current
-    if (!container) return
-    // 刚进入会话：直接跳到最底部看最新消息（打开历史会话时容器默认在顶部）。
-    // 只在用户并未主动介入判断——打开会话 / 发送 / 重放都意味着要看最新内容
-    if (revealLatestRef.current) {
-      revealLatestRef.current = false
-      container.scrollTop = container.scrollHeight
-      return
-    }
-    // 运行中实时追加内容：只在用户原本贴底时持续贴底；若已向上滚动读某条工具
-    // 详情，不能每次新事件都把页面拽回底部
-    const isPinned = container.scrollTop + container.clientHeight >= container.scrollHeight - 4
-    if (!isPinned) return
-    container.scrollTop = container.scrollHeight
-  }, [timeline, awaiting])
+  // 会话进入 / 发送 / 重放时在各自动作处调用 scrollToBottom() 强制贴底；
+  // 运行中的流式追加由 useStickToBottom 的 ResizeObserver 贴底跟随：
+  // 用户滚离阅读时不打扰，贴底时内容增长自动滚到底
 
   function createNew() {
     void refetchAvailableModels()
     eventAbort.current?.abort()
     skipTranscriptLoadFor.current = null
-    revealLatestRef.current = false
     setActiveId(null)
     setNewSession(true)
     setTimeline([])
@@ -592,7 +579,7 @@ export function AgentWorkspace() {
     void refetchAvailableModels()
     eventAbort.current?.abort()
     skipTranscriptLoadFor.current = null
-    revealLatestRef.current = true
+    scrollToBottom()
     setRunning(false)
     setEditingMessage(null)
     setEditReplayConfirmation(null)
@@ -627,7 +614,7 @@ export function AgentWorkspace() {
       return
     }
     const files = attachments
-    revealLatestRef.current = true
+    scrollToBottom()
     setTimeline((current) => appendUserMessage(current, content, undefined, Date.now(), files))
     setDraft('')
     setAttachments([])
@@ -647,7 +634,7 @@ export function AgentWorkspace() {
       attachmentError,
       editingMessage,
     }
-    revealLatestRef.current = true
+    scrollToBottom()
     setTimeline((current) => replaceFromUserMessage(current, messageId, content, files))
     setEditReplayConfirmation(null)
     setEditingMessage(null)
@@ -983,11 +970,14 @@ export function AgentWorkspace() {
       <div className="relative flex min-w-0 flex-1 flex-col">
         {hasMessages ? (
           <>
-            <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-              <div className="mx-auto max-w-3xl px-4 pb-6 pt-16">
-                <AgentTimeline items={timeline} onPermissionDecision={handlePermissionDecision} onUserEdit={handleUserEdit} />
-                {waitingReply ? <WaitingIndicator state={waitingOrbState} /> : null}
+            <div className="relative min-h-0 flex-1">
+              <div ref={scrollRef} className="h-full overflow-y-auto">
+                <div className="mx-auto max-w-3xl px-4 pb-6 pt-16">
+                  <AgentTimeline items={timeline} onPermissionDecision={handlePermissionDecision} onUserEdit={handleUserEdit} />
+                  {waitingReply ? <WaitingIndicator state={waitingOrbState} /> : null}
+                </div>
               </div>
+              {showJump ? <JumpToLatestButton label={t('agent:chat.scrollToLatest')} onClick={scrollToBottom} /> : null}
             </div>
             <div className="shrink-0 px-4 pb-4">
               <div className="mx-auto max-w-3xl">
