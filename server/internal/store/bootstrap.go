@@ -101,6 +101,9 @@ func ensureDatabaseInitializedOnce(ctx context.Context, cfg config.Config) error
 		return err
 	}
 	if len(missing) == 0 {
+		if err := runSchemaMigrations(ctx, db); err != nil {
+			return fmt.Errorf("upgrade database schema: %w", err)
+		}
 		return ensureSchemaUpgrades(ctx, db)
 	}
 
