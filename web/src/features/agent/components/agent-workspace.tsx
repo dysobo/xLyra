@@ -368,20 +368,32 @@ export function AgentWorkspace() {
     // 解析造成卡顿。delta 按到达顺序在 buffer 里累积，flush 时一次性 reduce，语义不变。
     const pending: { type: string; data: unknown }[] = []
     let frame: number | null = null
+    let fallback: number | null = null
     const flush = () => {
-      frame = null
+      if (frame !== null) {
+        cancelAnimationFrame(frame)
+        frame = null
+      }
+      if (fallback !== null) {
+        window.clearTimeout(fallback)
+        fallback = null
+      }
       if (pending.length === 0) return
       const events = pending.splice(0, pending.length)
       setTimeline((current) => events.reduce(reduceAgentEvent, current))
     }
     const enqueue = (event: { type: string; data: unknown }, flushNow: boolean) => {
       pending.push(event)
-      if (frame !== null) return
+      if (frame !== null || fallback !== null) return
       if (flushNow) {
         flush()
         return
       }
+      // rAF 在标签页隐藏/窗口被完全遮挡时不再触发，delta 会全程积压在 buffer 里，
+      // 回到前台时「一次性吐出来」。并挂一个超时兜底：可见时 rAF 先触发（兜底被取消），
+      // 不可见时由节流后的定时器推进，界面始终按节奏增量渲染
       frame = requestAnimationFrame(flush)
+      fallback = window.setTimeout(flush, 100)
     }
     try {
       await followAgentEvents(sessionId, controller.signal, (event) => {

@@ -131,8 +131,13 @@ function RunBlock({ run, onPermissionDecision }: { run: AgentRun; onPermissionDe
   const settled = run.status === 'done' && lastTextIndex >= 0
   // 结束后最后一段文本是最终回复，其余（中间输出 + 工具组 + 权限卡）全部归入工作过程
   const finalIndex = settled ? lastTextIndex : -1
-  const processItems = finalIndex >= 0 ? flow.filter((_, index) => index !== finalIndex) : flow
-  const finalItem = finalIndex >= 0 ? flow[finalIndex] : undefined
+  // 运行中位于流程末尾的文本段直接按最终回复的位置渲染（无竖线）：它是最终回复时
+  // 流完原地落定，结束时没有任何移动；若后面又来工具调用/权限卡，它回到流程里，
+  // 竖线延伸下来，文本的垂直位置不变
+  const liveTailIndex = run.status === 'running' && lastTextIndex >= 0 && lastTextIndex === flow.length - 1 ? lastTextIndex : -1
+  const tailIndex = finalIndex >= 0 ? finalIndex : liveTailIndex
+  const processItems = tailIndex >= 0 ? flow.filter((_, index) => index !== tailIndex) : flow
+  const finalItem = tailIndex >= 0 ? flow[tailIndex] : undefined
   // 复制内容与展示口径一致：只复制作为回复展示的最后一段，不带中间输出
   const replyText = finalItem?.kind === 'text' ? finalItem.text : run.finalText
   const [override, setOverride] = useState<boolean | null>(null)
@@ -182,17 +187,27 @@ function RunBlock({ run, onPermissionDecision }: { run: AgentRun; onPermissionDe
               if (item.kind === 'status') {
                 return <StatusStepLine key={item.id} step={item.step} />
               }
-              return <StepGroup key={item.id} steps={item.steps} active={!done && index === processItems.length - 1} />
+              // 末尾文本段被提升为实时回复时，它前面的工具组不再是流式尾部，
+              // 保持完成汇总标签，不要在文本流式期间跳回「运行中」
+              return <StepGroup key={item.id} steps={item.steps} active={!done && liveTailIndex < 0 && index === processItems.length - 1} />
             })}
           </div>
         ) : null}
       </div>
 
       {finalItem?.kind === 'text' ? (
-        <MarkdownMessage content={finalItem.text} className="text-[15px] leading-7" />
-      ) : null}
-
-      {done && !pausedForPermission && replyText ? (
+        <div className="group space-y-1">
+          <MarkdownMessage content={finalItem.text} className="text-[15px] leading-7" />
+          {done && !pausedForPermission && replyText ? (
+            // 复制入口常驻布局（opacity 切换，不占位消失），避免 hover 时下方内容跳动；
+            // 桌面端 hover 回复文本时显现，移动端无 hover 保持常显
+            <div className="flex items-center gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+              <CopyMessageAction text={replyText} />
+            </div>
+          ) : null}
+        </div>
+      ) : done && !pausedForPermission && replyText ? (
+        // 回复文本未能提升为最终输出时（如出错 run 的部分输出在过程区），复制入口单独常显
         <div className="flex items-center gap-2">
           <CopyMessageAction text={replyText} />
         </div>
