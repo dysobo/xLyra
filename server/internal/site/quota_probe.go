@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -280,10 +281,14 @@ func quotaProbeCredentialEligible(credentialType string) bool {
 }
 
 // defaultQuotaProbeTypeForSite 给未显式配置 quota_probe 的站点类型提供默认探测。
-// Kimi Code 官方站（api.kimi.com/coding）有 Coding Plan 额度接口，无需用户配置。
+// Kimi Code 官方站（api.kimi.com/coding）与 GLM Code 官方站（open.bigmodel.cn）
+// 都有 Coding Plan 额度接口，无需用户配置。
 func defaultQuotaProbeTypeForSite(item store.Site) string {
 	if item.SiteType == "kimi_code" {
 		return QuotaProbeTypeKimi
+	}
+	if item.SiteType == "glm_code" {
+		return QuotaProbeTypeGLM
 	}
 	return ""
 }
@@ -442,6 +447,8 @@ func probeQuota(ctx context.Context, client *http.Client, probeType string, base
 		kind, entries, err = probeXLyraQuota(ctx, client, baseURL, secret)
 	case QuotaProbeTypeKimi:
 		kind, entries, result.Plan, err = probeKimiQuota(ctx, client, baseURL, secret)
+	case QuotaProbeTypeGLM:
+		kind, entries, result.Plan, err = probeGLMQuota(ctx, client, baseURL, secret)
 	default:
 		err = fmt.Errorf("unsupported quota probe type %q", probeType)
 	}
@@ -808,6 +815,123 @@ func kimiMembershipPlanName(level string, region string) string {
 		}
 		return strings.ToUpper(name[:1]) + strings.ToLower(name[1:])
 	}
+}
+
+// probeGLMQuota 查询 GLM Coding Plan 的额度。
+// 接口：GET {origin}/api/monitor/usage/quota/limit，Bearer 为推理用 API Key，
+// origin 取站点 base_url 的 scheme://host（open.bigmodel.cn 与 api.z.ai 同路径）。
+// TOKENS_LIMIT 按窗口时长识别 5 小时（300 分钟）/ 周（10080 分钟）窗口；
+// percentage 是已用百分比，带 usage/remaining 计数时按计数精确换算。
+func probeGLMQuota(ctx context.Context, client *http.Client, baseURL string, secret string) (string, []QuotaProbeEntry, string, error) {
+	endpoint, err := quotaProbeGLMLimitURL(baseURL)
+	if err != nil {
+		return "", nil, "", err
+	}
+	payload, err := quotaProbeGetJSON(ctx, client, endpoint, secret)
+	if err != nil {
+		return "", nil, "", err
+	}
+	if code := quotaProbeFloat(payload["code"]); code == nil || *code != 200 {
+		return "", nil, "", fmt.Errorf("quota limit endpoint returned error: %s", anyString(payload["msg"]))
+	}
+	data, ok := payload["data"].(map[string]any)
+	if !ok {
+		return "", nil, "", fmt.Errorf("quota limit endpoint did not return data")
+	}
+
+	entries := make([]QuotaProbeEntry, 0, 2)
+	for _, raw := range anySlice(data["limits"]) {
+		item, _ := raw.(map[string]any)
+		if !strings.EqualFold(anyString(item["type"]), "TOKENS_LIMIT") {
+			continue
+		}
+		label := glmWindowLabel(item)
+		if label == "" {
+			continue
+		}
+		if entry, ok := glmPercentEntry(label, item); ok {
+			entries = append(entries, entry)
+		}
+	}
+	if len(entries) == 0 {
+		return "", nil, "", fmt.Errorf("quota limit endpoint did not contain token quota data")
+	}
+	return "token_plan", entries, glmPlanName(anyString(data["level"])), nil
+}
+
+// glmWindowLabel 按窗口时长识别 TOKENS_LIMIT 窗口：300 分钟 = 5 小时，10080 分钟 = 周。
+// unit 是时间单位编码（1=天 3=小时 5=分钟 6=周），窗口分钟数 = number × unit 换算值。
+// 未知窗口（如日/月）跳过；官方新增窗口时给 glmUnitMinutes 加映射即可。
+var glmUnitMinutes = map[int]int{1: 1440, 3: 60, 5: 1, 6: 10080}
+
+func glmWindowLabel(item map[string]any) string {
+	unit := quotaProbeFloat(item["unit"])
+	number := quotaProbeFloat(item["number"])
+	if unit == nil || number == nil || *number <= 0 {
+		return ""
+	}
+	minutes, ok := glmUnitMinutes[int(*unit)]
+	if !ok {
+		return ""
+	}
+	switch minutes * int(*number) {
+	case 300:
+		return "five_hour"
+	case 10080:
+		return "weekly"
+	}
+	return ""
+}
+
+// glmPercentEntry 把一条 TOKENS_LIMIT 折算成百分比 entry（limit 恒为 100），
+// 与 kimi 的 entries 同构，前端按 five_hour/weekly label 渲染。
+func glmPercentEntry(label string, item map[string]any) (QuotaProbeEntry, bool) {
+	limit := 100.0
+	entry := QuotaProbeEntry{Label: label, Unit: "percent", Limit: &limit}
+	if usage := quotaProbeFloat(item["usage"]); usage != nil && *usage > 0 {
+		if remaining := quotaProbeFloat(item["remaining"]); remaining != nil {
+			pct := min(100, max(0, *remaining / *usage * 100))
+			used := 100 - pct
+			entry.Remaining = &pct
+			entry.Used = &used
+		}
+	}
+	if entry.Remaining == nil {
+		used := quotaProbeFloat(item["percentage"])
+		if used == nil {
+			return QuotaProbeEntry{}, false
+		}
+		clamped := min(100, max(0, *used))
+		entry.Used = &clamped
+		remaining := 100 - clamped
+		entry.Remaining = &remaining
+	}
+	if reset := quotaProbeFloat(item["nextResetTime"]); reset != nil {
+		resetAt := time.UnixMilli(int64(*reset)).UTC().Format(time.RFC3339)
+		entry.ResetAt = &resetAt
+	}
+	return entry, true
+}
+
+// glmPlanName 把 data.level（如 "pro"）转为档位名（"Pro"）。
+func glmPlanName(level string) string {
+	level = strings.TrimSpace(level)
+	if level == "" {
+		return ""
+	}
+	return strings.ToUpper(level[:1]) + strings.ToLower(level[1:])
+}
+
+func quotaProbeGLMLimitURL(baseURL string) (string, error) {
+	base := strings.TrimSpace(baseURL)
+	if base == "" {
+		base = "https://open.bigmodel.cn"
+	}
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("invalid base URL %q for GLM quota probe", baseURL)
+	}
+	return parsed.Scheme + "://" + parsed.Host + "/api/monitor/usage/quota/limit", nil
 }
 
 func anySlice(value any) []any {

@@ -21,6 +21,7 @@ func TestNormalizeQuotaProbeType(t *testing.T) {
 		"newapi":  QuotaProbeTypeNewAPI,
 		"xlyra":   QuotaProbeTypeXLyra,
 		"kimi":    QuotaProbeTypeKimi,
+		"glm":     QuotaProbeTypeGLM,
 	} {
 		value, err := NormalizeQuotaProbeType(input)
 		if err != nil || value != expected {
@@ -867,7 +868,10 @@ func TestDefaultQuotaProbeTypeForSite(t *testing.T) {
 	if got := defaultQuotaProbeTypeForSite(store.Site{SiteType: "kimi_code"}); got != QuotaProbeTypeKimi {
 		t.Fatalf("kimi_code default probe = %q, want %q", got, QuotaProbeTypeKimi)
 	}
-	for _, siteType := range []string{"moonshot", "glm_code", "newapi", "openai"} {
+	if got := defaultQuotaProbeTypeForSite(store.Site{SiteType: "glm_code"}); got != QuotaProbeTypeGLM {
+		t.Fatalf("glm_code default probe = %q, want %q", got, QuotaProbeTypeGLM)
+	}
+	for _, siteType := range []string{"moonshot", "zhipu", "newapi", "openai"} {
 		if got := defaultQuotaProbeTypeForSite(store.Site{SiteType: siteType}); got != "" {
 			t.Fatalf("site_type %q default probe = %q, want empty", siteType, got)
 		}
@@ -895,5 +899,85 @@ func TestPreserveQuotaSummaryValuesKeepsEntriesAndPlan(t *testing.T) {
 	}
 	if _, ok := summary["entries"].([]any); !ok {
 		t.Fatalf("summary entries = %#v, want preserved", summary["entries"])
+	}
+}
+
+// 与 2026-09 实测 open.bigmodel.cn 响应一致，另混入 TIME_LIMIT（MCP 月度）与
+// 未知日窗口（unit=1×1），断言二者不会出现在 entries 里。
+const glmQuotaLimitFixture = `{
+	"code": 200,
+	"msg": "操作成功",
+	"data": {
+		"level": "pro",
+		"limits": [
+			{"type": "TOKENS_LIMIT", "unit": 3, "number": 5, "percentage": 0},
+			{"type": "TOKENS_LIMIT", "unit": 6, "number": 1, "percentage": 100, "nextResetTime": 1789005599998},
+			{"type": "TIME_LIMIT", "unit": 5, "number": 1, "usage": 1000, "currentValue": 7, "remaining": 993, "percentage": 1, "nextResetTime": 1790128799997},
+			{"type": "TOKENS_LIMIT", "unit": 1, "number": 1, "percentage": 42}
+		]
+	},
+	"success": true
+}`
+
+func TestProbeGLMQuota(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/monitor/usage/quota/limit" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer sk-glm" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(glmQuotaLimitFixture))
+	}))
+	defer server.Close()
+
+	// base_url 带 /api/coding/paas/v4 时仍应打到 origin 根路径
+	result := probeQuota(context.Background(), server.Client(), QuotaProbeTypeGLM, server.URL+"/api/coding/paas/v4", "sk-glm")
+	if result.Status != "ok" || result.Kind != "token_plan" {
+		t.Fatalf("expected ok token_plan result, got %+v", result)
+	}
+	if result.Plan != "Pro" {
+		t.Fatalf("plan = %q, want Pro (level pro)", result.Plan)
+	}
+	if len(result.Entries) != 2 {
+		t.Fatalf("expected five_hour + weekly entries only, got %+v", result.Entries)
+	}
+
+	fiveHour := result.Entries[0]
+	if fiveHour.Label != "five_hour" || fiveHour.Unit != "percent" {
+		t.Fatalf("unexpected five_hour entry %+v", fiveHour)
+	}
+	if fiveHour.Remaining == nil || *fiveHour.Remaining != 100 || fiveHour.Used == nil || *fiveHour.Used != 0 {
+		t.Fatalf("five_hour numbers = %+v, want remaining 100 used 0", fiveHour)
+	}
+
+	weekly := result.Entries[1]
+	if weekly.Label != "weekly" || weekly.Remaining == nil || *weekly.Remaining != 0 {
+		t.Fatalf("unexpected weekly entry %+v", weekly)
+	}
+	if weekly.ResetAt == nil || *weekly.ResetAt != "2026-09-10T01:59:59Z" {
+		t.Fatalf("weekly reset_at = %v, want 2026-09-10T01:59:59Z (fixture nextResetTime ms)", weekly.ResetAt)
+	}
+
+	// 周额度剩余 0% 最紧张，应成为主 entry 供 summary 展示
+	primary, ok := quotaProbePrimaryEntry(result)
+	if !ok || primary.Label != "weekly" || *primary.Remaining != 0 {
+		t.Fatalf("primary entry = %+v %v, want tightest window (weekly 0%%)", primary, ok)
+	}
+}
+
+func TestProbeGLMQuotaRejectsErrorCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code": 401, "msg": "未授权", "success": false}`))
+	}))
+	defer server.Close()
+
+	result := probeQuota(context.Background(), server.Client(), QuotaProbeTypeGLM, server.URL, "sk-glm")
+	if result.Status != "error" || result.Error == "" {
+		t.Fatalf("expected error result for non-200 code, got %+v", result)
 	}
 }
