@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { loadConversations, loadSettings, saveConversations, saveSettings } from '@/features/playground/lib/storage'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { isUUID, loadConversations, loadSettings, newId, saveConversations, saveSettings } from '@/features/playground/lib/storage'
 
 const values = new Map<string, string>()
 
@@ -8,6 +8,32 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => values.set(key, value),
+  })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+describe('newId', () => {
+  it('returns a UUID when randomUUID is unavailable in an insecure context', () => {
+    vi.stubGlobal('crypto', {
+      getRandomValues: (bytes: Uint8Array) => {
+        bytes.fill(0)
+        return bytes
+      },
+    })
+
+    const id = newId()
+
+    expect(isUUID(id)).toBe(true)
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/)
+  })
+
+  it('still returns a UUID when Web Crypto is unavailable', () => {
+    vi.stubGlobal('crypto', {})
+
+    expect(isUUID(newId())).toBe(true)
   })
 })
 
@@ -77,6 +103,30 @@ describe('loadSettings', () => {
 })
 
 describe('conversation storage', () => {
+  it('migrates legacy conversation ids before they reach the server', () => {
+    values.set('xlyra-playground-conversations', JSON.stringify([{
+      id: 'id-legacy-123',
+      title: 'Legacy',
+      model: 'gpt-test',
+      systemPrompt: '',
+      messages: [],
+      createdAt: 1,
+      updatedAt: 1,
+      serverPersisted: true,
+      lastOrdinal: 4,
+      activeRun: { id: 'run-1', status: 'running' },
+    }]))
+
+    const [conversation] = loadConversations()
+
+    expect(isUUID(conversation.id)).toBe(true)
+    expect(conversation.serverPersisted).toBe(false)
+    expect(conversation.lastOrdinal).toBeUndefined()
+    expect(conversation.activeRun).toBeUndefined()
+    expect(conversation.title).toBe('Legacy')
+    expect(JSON.parse(values.get('xlyra-playground-conversations') ?? '[]')[0].id).toBe(conversation.id)
+  })
+
   it('persists attachment metadata without storing the binary payload', () => {
     saveConversations([{
       id: 'conversation-1',
