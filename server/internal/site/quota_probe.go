@@ -88,8 +88,13 @@ func (s *Service) runQuotaProbes(ctx context.Context, item store.Site) store.Sit
 		if probeType == QuotaProbeTypeSub2API && result.Status == "ok" {
 			s.recoverSub2APISubscriptionCooldown(ctx, item.ID, credential.ID, result)
 		}
+		freshOK := result.Status == "ok"
 		if result.Status != "ok" {
 			result = preserveQuotaProbeResult(credential.Meta, result)
+		}
+		// 只对本次新鲜成功的探测同步冷却；失败时保留的旧数据不用于冷却判断
+		if freshOK && (probeType == QuotaProbeTypeKimi || probeType == QuotaProbeTypeGLM) {
+			s.syncCodingPlanQuotaCooldown(ctx, item.ID, credential.ID, result)
 		}
 		if result.Status == "ok" {
 			okCount++
@@ -275,6 +280,61 @@ func sub2APISubscriptionQuotaEntry(result QuotaProbeResult, limitWindow string) 
 		}
 	}
 	return QuotaProbeEntry{}, false
+}
+
+// syncCodingPlanQuotaCooldown 按 Kimi/GLM Coding Plan 探测结果冷却或解冻凭据：
+// 5 小时或周额度耗尽（remaining 为 0）且带未来重置时间时，把凭据冷却到最晚的
+// 重置时间，不在没额度的时候继续调用；所有窗口都有额度时解除探测冷却（窗口
+// 提前重置或升档都能及时恢复）。只动探测自己设置的冷却，网关因鉴权/限流设置
+// 的冷却不受影响。Best-effort。
+func (s *Service) syncCodingPlanQuotaCooldown(ctx context.Context, siteID uuid.UUID, credentialID uuid.UUID, result QuotaProbeResult) {
+	if result.Status != "ok" || credentialID == uuid.Nil {
+		return
+	}
+	repo := store.NewRouteCooldownRepository(s.db.DB())
+	deadline, windows := codingPlanQuotaCooldownDeadline(result, time.Now())
+	if deadline.IsZero() {
+		_, _ = repo.ClearActiveMatching(ctx, store.ClearActiveCooldownFilter{
+			SiteID:           siteID,
+			SiteCredentialID: uuid.NullUUID{UUID: credentialID, Valid: true},
+			Reasons:          []string{store.CooldownReasonCodingPlanQuotaExhausted},
+		})
+		return
+	}
+	_, _ = repo.Activate(ctx, store.ActivateRouteCooldownParams{
+		SiteID:           siteID,
+		SiteCredentialID: credentialID,
+		Scope:            "credential",
+		Source:           "quota_probe",
+		Reason:           store.CooldownReasonCodingPlanQuotaExhausted,
+		ActiveUntil:      deadline,
+		Metadata: store.JSON(jsonBytes(map[string]any{
+			"exhausted_windows": windows,
+			"reset_at":          deadline.UTC().Format(time.RFC3339),
+		})),
+	})
+}
+
+// codingPlanQuotaCooldownDeadline 从探测结果里找出已耗尽的窗口（remaining 为 0 且
+// 带未来重置时间），返回最晚的重置时间作为冷却截止——所有窗口都有额度时站点才
+// 可用，所以要等到最后一个耗尽窗口重置。没有耗尽窗口时返回零值。
+func codingPlanQuotaCooldownDeadline(result QuotaProbeResult, now time.Time) (time.Time, []string) {
+	var deadline time.Time
+	windows := []string{}
+	for _, entry := range result.Entries {
+		if entry.Remaining == nil || *entry.Remaining > 0 || entry.ResetAt == nil {
+			continue
+		}
+		resetAt, err := time.Parse(time.RFC3339, *entry.ResetAt)
+		if err != nil || !resetAt.After(now) {
+			continue
+		}
+		windows = append(windows, entry.Label)
+		if resetAt.After(deadline) {
+			deadline = resetAt
+		}
+	}
+	return deadline, windows
 }
 
 func quotaProbeCredentialEligible(credentialType string) bool {

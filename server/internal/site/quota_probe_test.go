@@ -1067,3 +1067,137 @@ func TestGLMPlanName(t *testing.T) {
 		t.Fatalf("glmPlanName(旗舰版) = %q, want valid non-empty UTF-8", got)
 	}
 }
+
+func TestCodingPlanQuotaCooldownDeadline(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 9, 8, 12, 0, 0, 0, time.UTC)
+	zero := 0.0
+	positive := 42.0
+	future1h := now.Add(time.Hour).Format(time.RFC3339)
+	future3d := now.Add(3 * 24 * time.Hour).Format(time.RFC3339)
+	past := now.Add(-time.Hour).Format(time.RFC3339)
+
+	// 两个窗口都耗尽时，冷却截止取最晚的重置时间（所有窗口都有额度才可用）
+	deadline, windows := codingPlanQuotaCooldownDeadline(QuotaProbeResult{Entries: []QuotaProbeEntry{
+		{Label: "five_hour", Remaining: &zero, ResetAt: &future1h},
+		{Label: "weekly", Remaining: &zero, ResetAt: &future3d},
+	}}, now)
+	if !deadline.Equal(now.Add(3*24*time.Hour)) || len(windows) != 2 {
+		t.Fatalf("deadline = %v windows = %v, want 3d deadline with both windows", deadline, windows)
+	}
+
+	// 只有 5 小时窗耗尽时按 5 小时窗重置时间冷却
+	deadline, windows = codingPlanQuotaCooldownDeadline(QuotaProbeResult{Entries: []QuotaProbeEntry{
+		{Label: "five_hour", Remaining: &zero, ResetAt: &future1h},
+		{Label: "weekly", Remaining: &positive, ResetAt: &future3d},
+	}}, now)
+	if !deadline.Equal(now.Add(time.Hour)) || len(windows) != 1 || windows[0] != "five_hour" {
+		t.Fatalf("deadline = %v windows = %v, want 1h deadline with five_hour only", deadline, windows)
+	}
+
+	// 耗尽但没有重置时间、重置时间已过、重置时间无法解析：都不冷却
+	for name, entries := range map[string][]QuotaProbeEntry{
+		"no reset":      {{Label: "five_hour", Remaining: &zero}},
+		"past reset":    {{Label: "five_hour", Remaining: &zero, ResetAt: &past}},
+		"invalid reset": {{Label: "five_hour", Remaining: &zero, ResetAt: new("soon")}},
+		"quota remains": {{Label: "five_hour", Remaining: &positive, ResetAt: &future1h}},
+		"nil remaining": {{Label: "five_hour", ResetAt: &future1h}},
+	} {
+		if deadline, windows := codingPlanQuotaCooldownDeadline(QuotaProbeResult{Entries: entries}, now); !deadline.IsZero() || len(windows) != 0 {
+			t.Fatalf("%s: deadline = %v windows = %v, want zero", name, deadline, windows)
+		}
+	}
+}
+
+func TestSyncCodingPlanQuotaCooldownActivatesOnExhaustedWindow(t *testing.T) {
+	t.Parallel()
+
+	credentialID := uuid.New()
+	reset := time.Now().Add(2 * time.Hour).UTC().Truncate(time.Second)
+	resetStr := reset.Format(time.RFC3339)
+	zero := 0.0
+
+	var created *store.RouteCooldown
+	db := siteTransactionPostgresGorm(t)
+	siteReplaceUpdateCallback(t, db, func(tx *gorm.DB) {
+		tx.RowsAffected = 1
+		tx.Statement.RowsAffected = 1
+	})
+	siteReplaceCreateCallback(t, db, func(tx *gorm.DB) {
+		item, ok := tx.Statement.Dest.(*store.RouteCooldown)
+		if !ok {
+			tx.AddError(gorm.ErrInvalidData)
+			return
+		}
+		copied := *item
+		created = &copied
+		tx.RowsAffected = 1
+		tx.Statement.RowsAffected = 1
+	})
+	service := NewService(siteStoreWithGorm(t, db), siteTestMasterKey)
+
+	service.syncCodingPlanQuotaCooldown(context.Background(), uuid.New(), credentialID, QuotaProbeResult{
+		Status:  "ok",
+		Entries: []QuotaProbeEntry{{Label: "five_hour", Remaining: &zero, ResetAt: &resetStr}},
+	})
+
+	if created == nil {
+		t.Fatal("expected a credential cooldown to be activated")
+	}
+	if !created.SiteCredentialID.Valid || created.SiteCredentialID.UUID != credentialID {
+		t.Fatalf("cooldown credential = %+v, want %v", created.SiteCredentialID, credentialID)
+	}
+	if created.Scope != "credential" || created.Source != "quota_probe" || created.Reason != store.CooldownReasonCodingPlanQuotaExhausted {
+		t.Fatalf("cooldown scope/source/reason = %q/%q/%q", created.Scope, created.Source, created.Reason)
+	}
+	if !created.ActiveUntil.Equal(reset) {
+		t.Fatalf("cooldown active_until = %v, want %v", created.ActiveUntil, reset)
+	}
+	meta := siteMustJSONMap(t, created.Metadata)
+	if meta["reset_at"] != resetStr {
+		t.Fatalf("cooldown metadata reset_at = %v, want %v", meta["reset_at"], resetStr)
+	}
+	windows, ok := meta["exhausted_windows"].([]any)
+	if !ok || len(windows) != 1 || windows[0] != "five_hour" {
+		t.Fatalf("cooldown metadata exhausted_windows = %v, want [five_hour]", meta["exhausted_windows"])
+	}
+}
+
+func TestSyncCodingPlanQuotaCooldownClearsWhenQuotaRecovers(t *testing.T) {
+	t.Parallel()
+
+	updates := 0
+	service := siteServiceWithCallbacks(t, siteGormCallbacks{
+		update: func(tx *gorm.DB) {
+			updates++
+			tx.RowsAffected = 1
+			tx.Statement.RowsAffected = 1
+		},
+	})
+	positive := 80.0
+	service.syncCodingPlanQuotaCooldown(context.Background(), uuid.New(), uuid.New(), QuotaProbeResult{
+		Status:  "ok",
+		Entries: []QuotaProbeEntry{{Label: "five_hour", Remaining: &positive}},
+	})
+	if updates != 1 {
+		t.Fatalf("cooldown clears = %d, want 1 (clear probe-set cooldown on recovery)", updates)
+	}
+}
+
+func TestSyncCodingPlanQuotaCooldownSkipsFailedProbe(t *testing.T) {
+	t.Parallel()
+
+	updates := 0
+	service := siteServiceWithCallbacks(t, siteGormCallbacks{
+		update: func(tx *gorm.DB) {
+			updates++
+			tx.RowsAffected = 1
+			tx.Statement.RowsAffected = 1
+		},
+	})
+	service.syncCodingPlanQuotaCooldown(context.Background(), uuid.New(), uuid.New(), QuotaProbeResult{Status: "error"})
+	if updates != 0 {
+		t.Fatalf("cooldown writes = %d, want 0 for failed probe", updates)
+	}
+}
