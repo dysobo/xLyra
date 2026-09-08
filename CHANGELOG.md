@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.7.0](https://github.com/Yachiyo-5i/xLyra/compare/v1.6.0...v1.7.0) (2026-09-08)
+
+
+### Features
+
+* 🎸 GLM Code 站点支持 Coding Plan 额度探测 ([d7e87bd](https://github.com/Yachiyo-5i/xLyra/commit/d7e87bdb51c9dd73e023387320d2a75d1dfaffe6))
+* 🎸 GLM Code 站点支持 Coding Plan 额度探测 ([f452cbc](https://github.com/Yachiyo-5i/xLyra/commit/f452cbc45cc1e9cf298fe5ba0b46817ee7d66d7a))
+* 🎸 Kimi 与 GLM 订阅额度耗尽时自动暂停调用直至额度重置 ([260ddd4](https://github.com/Yachiyo-5i/xLyra/commit/260ddd4de89ee46c15fd95cbbed462cdb4a018cc))
+* 🎸 Kimi 与 GLM 订阅额度耗尽时自动暂停调用直至额度重置 ([af9ee82](https://github.com/Yachiyo-5i/xLyra/commit/af9ee8233458550f3736d8f92300c0c6db1706a5))
+* **server,web:** ✨ 推理强度档位规范、映射与前端选择器联动 ([55bf307](https://github.com/Yachiyo-5i/xLyra/commit/55bf3071b8d0cc70d6f098dcbda86769a83c9323))
+* **server,web:** ✨ 推理强度档位规范、映射与前端选择器联动 ([dd7f524](https://github.com/Yachiyo-5i/xLyra/commit/dd7f52469534d3071cb406bf3db126ae1df81344))
+
+
+### Bug Fixes
+
+* 🐛 修复额度探测在中转站点误开启及订阅窗口信息异常的问题 ([7775b0d](https://github.com/Yachiyo-5i/xLyra/commit/7775b0db4cc8c8e477b5ca738906e171a94ed63f))
+
 ## [1.6.0](https://github.com/Yachiyo-5i/xLyra/compare/v1.5.2...v1.6.0) (2026-09-06)
 
 
