@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -21,6 +22,7 @@ func TestNormalizeQuotaProbeType(t *testing.T) {
 		"newapi":  QuotaProbeTypeNewAPI,
 		"xlyra":   QuotaProbeTypeXLyra,
 		"kimi":    QuotaProbeTypeKimi,
+		"glm":     QuotaProbeTypeGLM,
 	} {
 		value, err := NormalizeQuotaProbeType(input)
 		if err != nil || value != expected {
@@ -864,10 +866,47 @@ func TestKimiWindowIsFiveHour(t *testing.T) {
 func TestDefaultQuotaProbeTypeForSite(t *testing.T) {
 	t.Parallel()
 
+	// 空 base_url 视为官方默认地址，默认开启探测。
 	if got := defaultQuotaProbeTypeForSite(store.Site{SiteType: "kimi_code"}); got != QuotaProbeTypeKimi {
 		t.Fatalf("kimi_code default probe = %q, want %q", got, QuotaProbeTypeKimi)
 	}
-	for _, siteType := range []string{"moonshot", "glm_code", "newapi", "openai"} {
+	if got := defaultQuotaProbeTypeForSite(store.Site{SiteType: "glm_code"}); got != QuotaProbeTypeGLM {
+		t.Fatalf("glm_code default probe = %q, want %q", got, QuotaProbeTypeGLM)
+	}
+
+	official := []struct {
+		siteType string
+		baseURL  string
+		want     string
+	}{
+		{"kimi_code", "https://api.kimi.com/coding", QuotaProbeTypeKimi},
+		{"kimi_code", "https://api.kimi.com/coding/v1", QuotaProbeTypeKimi},
+		{"glm_code", "https://open.bigmodel.cn/api/coding/paas/v4", QuotaProbeTypeGLM},
+		{"glm_code", "https://api.z.ai/api/coding/paas/v4", QuotaProbeTypeGLM},
+	}
+	for _, tc := range official {
+		if got := defaultQuotaProbeTypeForSite(store.Site{SiteType: tc.siteType, BaseURL: tc.baseURL}); got != tc.want {
+			t.Fatalf("site_type %q base_url %q default probe = %q, want %q", tc.siteType, tc.baseURL, got, tc.want)
+		}
+	}
+
+	// 指向中转/镜像的站点不默认探测，避免对未实现额度接口的端点持续报错。
+	thirdParty := []struct {
+		siteType string
+		baseURL  string
+	}{
+		{"kimi_code", "https://relay.example.com/coding"},
+		{"glm_code", "https://relay.example.com/api/coding/paas/v4"},
+		{"glm_code", "https://bigmodel.cn.evil.example.com/api/coding/paas/v4"},
+		{"glm_code", "not a url"},
+	}
+	for _, tc := range thirdParty {
+		if got := defaultQuotaProbeTypeForSite(store.Site{SiteType: tc.siteType, BaseURL: tc.baseURL}); got != "" {
+			t.Fatalf("site_type %q base_url %q default probe = %q, want empty", tc.siteType, tc.baseURL, got)
+		}
+	}
+
+	for _, siteType := range []string{"moonshot", "zhipu", "newapi", "openai"} {
 		if got := defaultQuotaProbeTypeForSite(store.Site{SiteType: siteType}); got != "" {
 			t.Fatalf("site_type %q default probe = %q, want empty", siteType, got)
 		}
@@ -895,5 +934,136 @@ func TestPreserveQuotaSummaryValuesKeepsEntriesAndPlan(t *testing.T) {
 	}
 	if _, ok := summary["entries"].([]any); !ok {
 		t.Fatalf("summary entries = %#v, want preserved", summary["entries"])
+	}
+}
+
+// 与 2026-09 实测 open.bigmodel.cn 响应一致，另混入 TIME_LIMIT（MCP 月度）与
+// 未知日窗口（unit=1×1），断言二者不会出现在 entries 里。
+const glmQuotaLimitFixture = `{
+	"code": 200,
+	"msg": "操作成功",
+	"data": {
+		"level": "pro",
+		"limits": [
+			{"type": "TOKENS_LIMIT", "unit": 3, "number": 5, "percentage": 0},
+			{"type": "TOKENS_LIMIT", "unit": 6, "number": 1, "percentage": 100, "nextResetTime": 1789005599998},
+			{"type": "TIME_LIMIT", "unit": 5, "number": 1, "usage": 1000, "currentValue": 7, "remaining": 993, "percentage": 1, "nextResetTime": 1790128799997},
+			{"type": "TOKENS_LIMIT", "unit": 1, "number": 1, "percentage": 42}
+		]
+	},
+	"success": true
+}`
+
+func TestProbeGLMQuota(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/monitor/usage/quota/limit" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer sk-glm" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(glmQuotaLimitFixture))
+	}))
+	defer server.Close()
+
+	// base_url 带 /api/coding/paas/v4 时仍应打到 origin 根路径
+	result := probeQuota(context.Background(), server.Client(), QuotaProbeTypeGLM, server.URL+"/api/coding/paas/v4", "sk-glm")
+	if result.Status != "ok" || result.Kind != "token_plan" {
+		t.Fatalf("expected ok token_plan result, got %+v", result)
+	}
+	if result.Plan != "Pro" {
+		t.Fatalf("plan = %q, want Pro (level pro)", result.Plan)
+	}
+	if len(result.Entries) != 2 {
+		t.Fatalf("expected five_hour + weekly entries only, got %+v", result.Entries)
+	}
+
+	fiveHour := result.Entries[0]
+	if fiveHour.Label != "five_hour" || fiveHour.Unit != "percent" {
+		t.Fatalf("unexpected five_hour entry %+v", fiveHour)
+	}
+	if fiveHour.Remaining == nil || *fiveHour.Remaining != 100 || fiveHour.Used == nil || *fiveHour.Used != 0 {
+		t.Fatalf("five_hour numbers = %+v, want remaining 100 used 0", fiveHour)
+	}
+
+	weekly := result.Entries[1]
+	if weekly.Label != "weekly" || weekly.Remaining == nil || *weekly.Remaining != 0 {
+		t.Fatalf("unexpected weekly entry %+v", weekly)
+	}
+	if weekly.ResetAt == nil || *weekly.ResetAt != "2026-09-10T01:59:59Z" {
+		t.Fatalf("weekly reset_at = %v, want 2026-09-10T01:59:59Z (fixture nextResetTime ms)", weekly.ResetAt)
+	}
+
+	// 周额度剩余 0% 最紧张，应成为主 entry 供 summary 展示
+	primary, ok := quotaProbePrimaryEntry(result)
+	if !ok || primary.Label != "weekly" || *primary.Remaining != 0 {
+		t.Fatalf("primary entry = %+v %v, want tightest window (weekly 0%%)", primary, ok)
+	}
+}
+
+func TestProbeGLMQuotaRejectsErrorCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code": 401, "msg": "未授权", "success": false}`))
+	}))
+	defer server.Close()
+
+	result := probeQuota(context.Background(), server.Client(), QuotaProbeTypeGLM, server.URL, "sk-glm")
+	if result.Status != "error" || result.Error == "" {
+		t.Fatalf("expected error result for non-200 code, got %+v", result)
+	}
+}
+
+// 同一窗口以不同单位编码返回两次时（unit=3/number=5 与 unit=5/number=300 都是
+// 300 分钟），按 label 去重并保留剩余最少的一条，避免前端 find 与 summary 的
+// min 选择口径不一致。
+func TestProbeGLMQuotaDeduplicatesWindowEncodings(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"code": 200,
+			"data": {
+				"level": "pro",
+				"limits": [
+					{"type": "TOKENS_LIMIT", "unit": 3, "number": 5, "percentage": 10},
+					{"type": "TOKENS_LIMIT", "unit": 5, "number": 300, "percentage": 40}
+				]
+			},
+			"success": true
+		}`))
+	}))
+	defer server.Close()
+
+	result := probeQuota(context.Background(), server.Client(), QuotaProbeTypeGLM, server.URL, "sk-glm")
+	if result.Status != "ok" {
+		t.Fatalf("expected ok result, got %+v", result)
+	}
+	if len(result.Entries) != 1 {
+		t.Fatalf("expected 1 deduplicated five_hour entry, got %+v", result.Entries)
+	}
+	entry := result.Entries[0]
+	if entry.Label != "five_hour" || entry.Remaining == nil || *entry.Remaining != 60 {
+		t.Fatalf("entry = %+v, want five_hour with tightest remaining 60%%", entry)
+	}
+}
+
+func TestGLMPlanName(t *testing.T) {
+	t.Parallel()
+
+	if got := glmPlanName("pro"); got != "Pro" {
+		t.Fatalf("glmPlanName(pro) = %q, want Pro", got)
+	}
+	if got := glmPlanName("  MAX "); got != "Max" {
+		t.Fatalf("glmPlanName(\"  MAX \") = %q, want Max", got)
+	}
+	if got := glmPlanName(""); got != "" {
+		t.Fatalf("glmPlanName(\"\") = %q, want empty", got)
+	}
+	// 非 ASCII level 不应切出半个多字节字符（无效 UTF-8）
+	if got := glmPlanName("旗舰版"); !utf8.ValidString(got) || got == "" {
+		t.Fatalf("glmPlanName(旗舰版) = %q, want valid non-empty UTF-8", got)
 	}
 }
