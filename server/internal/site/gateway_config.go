@@ -16,6 +16,7 @@ const (
 	QuotaProbeTypeNewAPI  = "newapi"
 	QuotaProbeTypeXLyra   = "xlyra"
 	QuotaProbeTypeKimi    = "kimi"
+	QuotaProbeTypeGLM     = "glm"
 )
 
 type GatewayConfig struct {
@@ -49,6 +50,8 @@ func NormalizeQuotaProbeType(value string) (string, error) {
 		return QuotaProbeTypeXLyra, nil
 	case QuotaProbeTypeKimi:
 		return QuotaProbeTypeKimi, nil
+	case QuotaProbeTypeGLM:
+		return QuotaProbeTypeGLM, nil
 	default:
 		return "", fmt.Errorf("unsupported quota_probe type %q", value)
 	}

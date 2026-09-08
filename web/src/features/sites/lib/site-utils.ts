@@ -241,8 +241,8 @@ function formatProbePercent(value: number) {
 
 export function formatQuotaProbeBalance(probe: SiteQuotaProbeSummary | null | undefined) {
   if (!probe) return undefined
-  if (probe.probe_type === 'kimi') {
-    return formatKimiQuotaBalance(probe)
+  if (probe.probe_type === 'kimi' || probe.probe_type === 'glm') {
+    return formatFiveHourWeeklyQuotaBalance(probe)
   }
   if (typeof probe.remaining_min !== 'number') {
     if (probe.unlimited !== true) return undefined
@@ -263,8 +263,8 @@ export function formatQuotaProbeBalance(probe: SiteQuotaProbeSummary | null | un
   return `${prefix}${remaining}${suffix}`
 }
 
-/** Kimi Coding Plan：额度列显示 "5 小时剩余 / 周剩余" 两个百分比 */
-function formatKimiQuotaBalance(probe: SiteQuotaProbeSummary) {
+/** Coding Plan（Kimi / GLM）：额度列显示 "5 小时剩余 / 周剩余" 两个百分比 */
+function formatFiveHourWeeklyQuotaBalance(probe: SiteQuotaProbeSummary) {
   const entries = probe.entries ?? []
   if (entries.length === 0) {
     return typeof probe.remaining_min === 'number' ? formatProbePercent(probe.remaining_min) : undefined
@@ -308,8 +308,8 @@ export function siteBalanceDetails(site: Site, language?: string): SiteBalanceDe
   const probe = site.quota_probe
   if (probe) {
     const probeType = probe.probe_type
-    if (probeType === 'kimi') {
-      return kimiQuotaDetails(probe, language)
+    if (probeType === 'kimi' || probeType === 'glm') {
+      return fiveHourWeeklyQuotaDetails(probe, language)
     }
     const { prefix, suffix } = quotaProbeCurrency(probe.unit)
     const amount = (value: number) => `${prefix}${formatProbeAmount(value)}${suffix}`
@@ -335,21 +335,21 @@ export function siteBalanceDetails(site: Site, language?: string): SiteBalanceDe
   return [{ label: 'accountBalance', value: fallback }]
 }
 
-const KIMI_ENTRY_ORDER = ['five_hour', 'weekly'] as const
+const WINDOW_QUOTA_ENTRY_ORDER = ['five_hour', 'weekly'] as const
 
-const KIMI_ENTRY_LABELS: Record<string, SiteBalanceDetailLabel> = {
+const WINDOW_QUOTA_ENTRY_LABELS: Record<string, SiteBalanceDetailLabel> = {
   five_hour: 'fiveHourQuota',
   weekly: 'weeklyQuota',
 }
 
-function kimiQuotaDetails(probe: SiteQuotaProbeSummary, language?: string): SiteBalanceDetail[] {
+function fiveHourWeeklyQuotaDetails(probe: SiteQuotaProbeSummary, language?: string): SiteBalanceDetail[] {
   const entries = probe.entries ?? []
-  const ordered = KIMI_ENTRY_ORDER
+  const ordered = WINDOW_QUOTA_ENTRY_ORDER
     .map((key) => entries.find((item) => item.label === key))
     .filter((entry): entry is SiteQuotaProbeEntry => !!entry)
   const rows: SiteBalanceDetail[] = []
   for (const entry of ordered) {
-    const label = KIMI_ENTRY_LABELS[entry.label]
+    const label = WINDOW_QUOTA_ENTRY_LABELS[entry.label]
     if (!label || typeof entry.remaining !== 'number') continue
     const value = formatProbePercent(entry.remaining)
     let extra: string | undefined

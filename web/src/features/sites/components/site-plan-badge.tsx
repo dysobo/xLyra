@@ -3,9 +3,9 @@ import { cn } from '@/lib/utils'
 import type { Site } from '@/features/sites/api/sites'
 
 /**
- * Kimi Coding Plan 的订阅档位 badge（Andante/Moderato/Allegretto/Allegro/Vivace）。
- * 档位名由后端 quota probe 从 /coding/v1/usages 的 membership.level 解析，
- * 通过 site.quota_probe.plan 透传；探测未成功时（plan 为空）不渲染。
+ * Coding Plan 订阅档位 badge，适用于 Kimi（Andante/…/Vivace）和 GLM（Pro/Max 等）。
+ * 档位名由后端 quota probe 从各平台额度接口解析（Kimi 取 membership.level，
+ * GLM 取 data.level），通过 site.quota_probe.plan 透传；探测未成功时（plan 为空）不渲染。
  */
 export function SitePlanBadge({ site, className }: { site: Site; className?: string }) {
   const plan = site.quota_probe?.plan

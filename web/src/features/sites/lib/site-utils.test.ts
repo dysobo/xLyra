@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Site } from '@/features/sites/api/sites'
+import type { Site, SiteQuotaProbeEntry } from '@/features/sites/api/sites'
 import { formatCompactTokens, formatDateTime, formatSiteBalance, isSiteAbnormal, siteBalanceDetails, sortSitesForDisplay, sub2APIKeyQuotaDetails } from '@/features/sites/lib/site-utils'
 
 function siteWithSyncState(failureClass: 'unknown' | 'limited' | 'transient' | 'credential_invalid'): Site {
@@ -83,6 +83,46 @@ describe('Kimi quota formatting', () => {
     const value = formatDateTime('2026-07-30T01:12:00Z', 'en', 'h23')
     expect(value).toMatch(/\b\d{2}:\d{2}\b/)
     expect(value).not.toMatch(/\b(?:AM|PM)\b/i)
+  })
+})
+
+describe('GLM quota formatting', () => {
+  const glmSite = (entries: SiteQuotaProbeEntry[]): Site => ({
+    ...siteWithSyncState('unknown'),
+    site_type: 'glm_code',
+    quota_probe: {
+      probe_type: 'glm',
+      remaining_min: 0,
+      unit: 'percent',
+      plan: 'Pro',
+      entries,
+    },
+  })
+
+  it('shows remaining quota for both windows in the table', () => {
+    const site = glmSite([
+      { label: 'five_hour', unit: 'percent', remaining: 100, limit: 100, used: 0 },
+      { label: 'weekly', unit: 'percent', remaining: 0, limit: 100, used: 100, reset_at: '2026-09-10T01:59:59Z' },
+    ])
+    expect(formatSiteBalance(site)).toBe('100% / 0%')
+  })
+
+  it('shows a dash for a missing window', () => {
+    const site = glmSite([
+      { label: 'five_hour', unit: 'percent', remaining: 97, limit: 100, used: 3 },
+    ])
+    expect(formatSiteBalance(site)).toBe('97% / -')
+  })
+
+  it('marks the remaining quota values for details', () => {
+    const site = glmSite([
+      { label: 'five_hour', unit: 'percent', remaining: 100, limit: 100, used: 0 },
+      { label: 'weekly', unit: 'percent', remaining: 0, limit: 100, used: 100 },
+    ])
+    expect(siteBalanceDetails(site).map((detail) => ({ label: detail.label, value: detail.value, valuePrefix: detail.valuePrefix }))).toEqual([
+      { label: 'fiveHourQuota', value: '100%', valuePrefix: 'remaining' },
+      { label: 'weeklyQuota', value: '0%', valuePrefix: 'remaining' },
+    ])
   })
 })
 
