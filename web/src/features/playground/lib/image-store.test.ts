@@ -20,7 +20,7 @@ function installIndexedDB(initial: Record<string, unknown>) {
             records.set(key, value)
           },
         }),
-      } as IDBTransaction
+      } as unknown as IDBTransaction
       if (mode === 'readwrite') queueMicrotask(() => transaction.oncomplete?.(new Event('complete')))
       return transaction
     },
