@@ -50,11 +50,18 @@ export type GatewayModel = {
   category: string
   ownedBy?: string
   endpointTypes: string[]
+  reasoning?: GatewayModelReasoning
 }
 
 export type ChatProtocol = 'chat' | 'responses' | 'messages'
 
-export type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'
+export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'
+
+/** Server-declared reasoning effort spec for a model (from protocol_specs.json via the gateway). */
+export type GatewayModelReasoning = {
+  levels: ReasoningEffort[]
+  thinkingMandatory?: boolean
+}
 
 export type ImageResultItem = {
   id: string

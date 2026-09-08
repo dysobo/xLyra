@@ -93,6 +93,8 @@
     "noModels": "No models available"
   },
   "effort": {
+    "none": "Off",
+    "minimal": "Minimal",
     "low": "Low",
     "medium": "Medium",
     "high": "High",

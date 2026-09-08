@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const supportedReasoningEfforts = "none, minimal, low, medium, high, xhigh, max, ultra"
+const supportedReasoningEfforts = "auto, none, minimal, low, medium, high, xhigh, max, ultra"
 
 func normalizeClientRequestOptions(payload map[string]any) *chatFailure {
 	if serviceTier, ok := payload["service_tier"].(string); ok {
@@ -74,10 +74,7 @@ func unsupportedReasoningEffortError(key string, value any) error {
 }
 
 func isSupportedReasoningEffort(effort string) bool {
-	switch effort {
-	case "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra":
-		return true
-	default:
-		return false
-	}
+	// "auto" is a gateway-level directive (resolve to the model's default),
+	// never forwarded upstream; the canonical ladder covers explicit levels.
+	return effort == "auto" || isCanonicalReasoningEffort(effort)
 }

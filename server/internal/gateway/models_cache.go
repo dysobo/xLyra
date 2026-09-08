@@ -498,16 +498,20 @@ func applyModelEndpointTypes(item map[string]any, endpointSet map[string]struct{
 }
 
 func canonicalModelPayload(model store.CanonicalModel) map[string]any {
+	metadata := map[string]any{
+		"canonical_model_id": model.ID.String(),
+		"display_name":       defaultString(model.DisplayName, model.ModelKey),
+		"category":           defaultString(model.Category, "chat"),
+	}
+	if effort := ReasoningEffortSpecForModel(model.ModelKey); effort != nil {
+		metadata["reasoning_effort"] = effort
+	}
 	return map[string]any{
 		"id":       model.ModelKey,
 		"object":   "model",
 		"created":  model.CreatedAt.Unix(),
 		"owned_by": defaultString(model.Provider, "xlyra"),
-		"metadata": map[string]any{
-			"canonical_model_id": model.ID.String(),
-			"display_name":       defaultString(model.DisplayName, model.ModelKey),
-			"category":           defaultString(model.Category, "chat"),
-		},
+		"metadata": metadata,
 	}
 }
 

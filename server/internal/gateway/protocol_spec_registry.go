@@ -20,13 +20,14 @@ type protocolSpecRegistryConfig struct {
 }
 
 type protocolSpecDefinition struct {
-	BaseProtocol  string                  `json:"base_protocol,omitempty"`
-	Events        map[string]eventMapping `json:"events,omitempty"`
-	ParamMappings []paramMappingConfig    `json:"param_mappings,omitempty"`
-	RequestParams requestParamPolicy      `json:"request_params,omitempty"`
-	Capabilities  map[string]bool         `json:"capabilities,omitempty"`
-	Reasoning     map[string]string       `json:"reasoning,omitempty"`
-	Documentation []string                `json:"documentation,omitempty"`
+	BaseProtocol    string                  `json:"base_protocol,omitempty"`
+	Events          map[string]eventMapping `json:"events,omitempty"`
+	ParamMappings   []paramMappingConfig    `json:"param_mappings,omitempty"`
+	RequestParams   requestParamPolicy      `json:"request_params,omitempty"`
+	Capabilities    map[string]bool         `json:"capabilities,omitempty"`
+	Reasoning       map[string]string       `json:"reasoning,omitempty"`
+	ReasoningEffort *reasoningEffortSpec    `json:"reasoning_effort,omitempty"`
+	Documentation   []string                `json:"documentation,omitempty"`
 }
 
 type providerSpecDefinition struct {
@@ -40,6 +41,7 @@ type providerSpecDefinition struct {
 	ProtocolRequestParams map[string]requestParamPolicy          `json:"protocol_request_params,omitempty"`
 	Capabilities          map[string]bool                        `json:"capabilities,omitempty"`
 	Reasoning             map[string]string                      `json:"reasoning,omitempty"`
+	ReasoningEffort       *reasoningEffortSpec                   `json:"reasoning_effort,omitempty"`
 	Documentation         []string                               `json:"documentation,omitempty"`
 }
 
@@ -53,7 +55,31 @@ type modelSpecDefinition struct {
 	RequestParams      requestParamPolicy                     `json:"request_params,omitempty"`
 	Capabilities       map[string]bool                        `json:"capabilities,omitempty"`
 	Reasoning          map[string]string                      `json:"reasoning,omitempty"`
+	ReasoningEffort    *reasoningEffortSpec                   `json:"reasoning_effort,omitempty"`
 	Documentation      []string                               `json:"documentation,omitempty"`
+}
+
+// reasoningEffortSpec declares which reasoning effort levels an upstream model
+// accepts and how the gateway should reconcile client-requested levels with
+// that set. Levels use the canonical ladder
+// (none < minimal < low < medium < high < xhigh < max < ultra).
+//
+// Mode "snap" (the default when the block is present) rewrites a requested
+// level to the nearest supported one; mode "passthrough" forwards the value
+// untouched for upstreams that accept the full ladder and snap server-side
+// (e.g. DeepSeek). ThinkingMandatory marks models whose thinking cannot be
+// disabled, so "none"/thinking-off requests are clamped to the lowest level
+// instead of being rejected by the upstream.
+//
+// Default is the level the gateway-level value "auto" resolves to for
+// ThinkingMandatory models (others drop "auto" so the upstream default
+// applies), and it is exposed to clients so their effort pickers can surface
+// the model's own default.
+type reasoningEffortSpec struct {
+	Levels            []string `json:"levels,omitempty"`
+	Mode              string   `json:"mode,omitempty"`
+	ThinkingMandatory bool     `json:"thinking_mandatory,omitempty"`
+	Default           string   `json:"default,omitempty"`
 }
 
 type eventMapping struct {
@@ -112,6 +138,7 @@ type resolvedProtocolSpec struct {
 	RequestParams      requestParamPolicy
 	Capabilities       map[string]bool
 	Reasoning          map[string]string
+	ReasoningEffort    *reasoningEffortSpec
 	Documentation      []string
 }
 
@@ -245,7 +272,9 @@ func applyResolvedRequestPolicy(payload map[string]any, spec resolvedProtocolSpe
 }
 
 func applyRequestPolicyForCandidate(payload map[string]any, protocol canonicalProtocol, candidate routeengine.Candidate) map[string]any {
-	return applyResolvedRequestPolicy(payload, effectiveProtocolSpec(protocol, candidate))
+	spec := effectiveProtocolSpec(protocol, candidate)
+	payload = applyResolvedRequestPolicy(payload, spec)
+	return applyReasoningEffortPolicy(payload, spec)
 }
 
 func validatePayloadParams(payload map[string]any, protocolName string, candidate routeengine.Candidate) error {
@@ -399,6 +428,9 @@ func mergeProtocolDefinition(resolved *resolvedProtocolSpec, config protocolSpec
 	mergeRequestParamPolicy(&resolved.RequestParams, def.RequestParams)
 	mergeBoolMap(resolved.Capabilities, def.Capabilities)
 	mergeStringMap(resolved.Reasoning, def.Reasoning)
+	if def.ReasoningEffort != nil {
+		resolved.ReasoningEffort = def.ReasoningEffort
+	}
 	resolved.Documentation = appendUniqueStrings(resolved.Documentation, def.Documentation...)
 }
 
@@ -414,6 +446,9 @@ func mergeProviderDefinition(resolved *resolvedProtocolSpec, def providerSpecDef
 	}
 	mergeBoolMap(resolved.Capabilities, def.Capabilities)
 	mergeStringMap(resolved.Reasoning, def.Reasoning)
+	if def.ReasoningEffort != nil {
+		resolved.ReasoningEffort = def.ReasoningEffort
+	}
 	resolved.Documentation = appendUniqueStrings(resolved.Documentation, def.Documentation...)
 }
 
@@ -426,6 +461,9 @@ func mergeModelDefinition(resolved *resolvedProtocolSpec, def modelSpecDefinitio
 	mergeRequestParamPolicy(&resolved.RequestParams, def.RequestParams)
 	mergeBoolMap(resolved.Capabilities, def.Capabilities)
 	mergeStringMap(resolved.Reasoning, def.Reasoning)
+	if def.ReasoningEffort != nil {
+		resolved.ReasoningEffort = def.ReasoningEffort
+	}
 	resolved.Documentation = appendUniqueStrings(resolved.Documentation, def.Documentation...)
 }
 
@@ -673,10 +711,16 @@ func validateProtocolSpecRegistry(config protocolSpecRegistryConfig) error {
 		if conflicts := validateRequestParamPolicyConflicts(def.RequestParams); len(conflicts) > 0 {
 			errs = append(errs, fmt.Sprintf("protocol %q: %s", name, strings.Join(conflicts, "; ")))
 		}
+		if err := validateReasoningEffortSpec(def.ReasoningEffort); err != nil {
+			errs = append(errs, fmt.Sprintf("protocol %q: %s", name, err))
+		}
 	}
 	for name, def := range config.Providers {
 		if conflicts := validateRequestParamPolicyConflicts(def.RequestParams); len(conflicts) > 0 {
 			errs = append(errs, fmt.Sprintf("provider %q: %s", name, strings.Join(conflicts, "; ")))
+		}
+		if err := validateReasoningEffortSpec(def.ReasoningEffort); err != nil {
+			errs = append(errs, fmt.Sprintf("provider %q: %s", name, err))
 		}
 		for protocol, policy := range def.ProtocolRequestParams {
 			if conflicts := validateRequestParamPolicyConflicts(policy); len(conflicts) > 0 {
@@ -687,6 +731,9 @@ func validateProtocolSpecRegistry(config protocolSpecRegistryConfig) error {
 	for name, def := range config.Models {
 		if conflicts := validateRequestParamPolicyConflicts(def.RequestParams); len(conflicts) > 0 {
 			errs = append(errs, fmt.Sprintf("model %q: %s", name, strings.Join(conflicts, "; ")))
+		}
+		if err := validateReasoningEffortSpec(def.ReasoningEffort); err != nil {
+			errs = append(errs, fmt.Sprintf("model %q: %s", name, err))
 		}
 	}
 	if len(errs) > 0 {

@@ -4,11 +4,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
+	"xlyra/server/internal/gateway"
 	sitepkg "xlyra/server/internal/site"
 	"xlyra/server/internal/store"
 )
@@ -276,5 +278,24 @@ func TestSiteUsagePayloadBuildsScalarUsageShape(t *testing.T) {
 
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("usage payload = %#v, want %#v", got, want)
+	}
+}
+
+func TestCanonicalModelPayloadExposesReasoningEffort(t *testing.T) {
+	t.Parallel()
+
+	payload := canonicalModelPayload(store.CanonicalModel{ModelKey: "claude-opus-4-6"})
+	effort, ok := payload["reasoning_effort"].(*gateway.ReasoningEffortInfo)
+	if !ok {
+		t.Fatalf("reasoning_effort missing or wrong type: %#v", payload["reasoning_effort"])
+	}
+	want := []string{"low", "medium", "high", "max"}
+	if !slices.Equal(effort.Levels, want) {
+		t.Fatalf("levels = %v, want %v", effort.Levels, want)
+	}
+
+	unknown := canonicalModelPayload(store.CanonicalModel{ModelKey: "some-unheard-of-model"})
+	if _, present := unknown["reasoning_effort"]; present {
+		t.Fatalf("unknown model must not carry reasoning_effort: %#v", unknown["reasoning_effort"])
 	}
 }
