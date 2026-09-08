@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"xlyra/server/internal/catalog"
+	"xlyra/server/internal/gateway"
 	"xlyra/server/internal/store"
 )
 
@@ -296,7 +297,7 @@ func (r canonicalModelRequest) toInput() catalog.UpsertCanonicalModelInput {
 }
 
 func canonicalModelPayload(model store.CanonicalModel) map[string]any {
-	return map[string]any{
+	payload := map[string]any{
 		"id":                     model.ID.String(),
 		"model_key":              model.ModelKey,
 		"display_name":           model.DisplayName,
@@ -316,6 +317,10 @@ func canonicalModelPayload(model store.CanonicalModel) map[string]any {
 		"created_at":             timeString(model.CreatedAt),
 		"updated_at":             timeString(model.UpdatedAt),
 	}
+	if effort := gateway.ReasoningEffortSpecForModel(model.ModelKey); effort != nil {
+		payload["reasoning_effort"] = effort
+	}
+	return payload
 }
 
 func canonicalModelItemPayload(item catalog.CanonicalModelItem) map[string]any {

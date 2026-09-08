@@ -7,7 +7,7 @@ import { ThinkingOrb, type OrbState } from 'thinking-orbs'
 import { Composer } from '@/features/playground/components/composer'
 import { ChatAttachmentItem } from '@/features/playground/components/chat-attachment'
 import { ModelReasoningPicker } from '@/features/playground/components/model-reasoning-picker'
-import { normalizeReasoningEffort } from '@/features/playground/lib/reasoning'
+import { normalizeReasoningEffort, parseGatewayModelReasoning } from '@/features/playground/lib/reasoning'
 import { attachmentMimeType, normalizeAttachmentDataURL } from '@/features/playground/lib/attachments'
 import type { ChatAttachment, GatewayModel, ReasoningEffort } from '@/features/playground/lib/types'
 import { newId } from '@/features/playground/lib/storage'
@@ -342,6 +342,7 @@ export function AgentWorkspace() {
             displayName: item.display_name || id,
             category: item.category ?? 'chat',
             endpointTypes: [],
+            reasoning: parseGatewayModelReasoning(item.reasoning_effort),
           })
         }
       }

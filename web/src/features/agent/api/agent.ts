@@ -54,7 +54,7 @@ export type AgentAvailableSite = {
   site_name: string
   site_type: string
   enabled: boolean
-  models: Array<Pick<SiteModel, 'id' | 'upstream_model_name' | 'display_name' | 'canonical_model_id'> & { model_key?: string; category?: string }>
+  models: Array<Pick<SiteModel, 'id' | 'upstream_model_name' | 'display_name' | 'canonical_model_id'> & { model_key?: string; category?: string; reasoning_effort?: unknown }>
 }
 
 // The runner returns 503 with a body that still carries version fields when
@@ -170,7 +170,7 @@ export async function fetchAgentAvailableModels(): Promise<AgentAvailableSite[]>
         enabled: true,
         models: (response.items ?? []).filter((model) => model.enabled !== false && model.status === 'active').map(({ id, upstream_model_name, display_name, canonical_model_id }) => {
           const canonical = canonical_model_id ? canonicalById.get(canonical_model_id) : undefined
-          return { id, upstream_model_name, display_name, canonical_model_id, model_key: canonical?.model_key, category: canonical?.category }
+          return { id, upstream_model_name, display_name, canonical_model_id, model_key: canonical?.model_key, category: canonical?.category, reasoning_effort: canonical?.reasoning_effort }
         }),
       }
     } catch {
