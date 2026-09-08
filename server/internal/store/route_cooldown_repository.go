@@ -41,6 +41,10 @@ const (
 	CooldownReasonUpstreamCredentialLimited         = "upstream_credential_limited"
 	CooldownReasonUpstreamSubscriptionLimitExceeded = "upstream_subscription_limit_exceeded"
 	CooldownReasonOpenCodeGoUsageLimitReached       = "opencode_go_usage_limit_reached"
+	// CooldownReasonCodingPlanQuotaExhausted marks a cooldown created by a Kimi/GLM
+	// Coding Plan quota probe that observed an exhausted 5-hour or weekly window
+	// with a known reset time, so the credential is skipped until the window resets.
+	CooldownReasonCodingPlanQuotaExhausted = "coding_plan_quota_exhausted"
 )
 
 func TransientRouteCooldown(item RouteCooldown) bool {
