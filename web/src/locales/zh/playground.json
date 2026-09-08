@@ -93,6 +93,8 @@
     "noModels": "暂无可用模型"
   },
   "effort": {
+    "none": "关闭",
+    "minimal": "极低",
     "low": "低",
     "medium": "中",
     "high": "高",

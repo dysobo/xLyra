@@ -8,7 +8,7 @@ import (
 func TestNormalizeClientRequestOptionsAcceptsSupportedReasoningEfforts(t *testing.T) {
 	t.Parallel()
 
-	for _, effort := range []string{"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"} {
+	for _, effort := range []string{"auto", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"} {
 		effort := effort
 		t.Run(effort, func(t *testing.T) {
 			t.Parallel()
@@ -34,7 +34,6 @@ func TestNormalizeClientRequestOptionsRejectsUnsupportedReasoningEffort(t *testi
 
 	tests := []map[string]any{
 		{"reasoning_effort": "light"},
-		{"reasoning": map[string]any{"effort": "auto"}},
 		{"reasoning_effort": 3},
 		{"reasoning_effort": "high", "reasoning": map[string]any{"effort": "ultra"}},
 	}

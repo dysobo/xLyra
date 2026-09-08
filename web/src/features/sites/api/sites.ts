@@ -266,6 +266,8 @@ export type CanonicalModel = {
   status: string
   created_at: string
   updated_at: string
+  /** Gateway-declared reasoning effort spec (levels/mode/thinking_mandatory); absent when undeclared. */
+  reasoning_effort?: unknown
 }
 
 export type CanonicalModelAlias = {

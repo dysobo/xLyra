@@ -63,7 +63,7 @@ export function loadSettings(): PlaygroundSettings {
   const stored = read<Partial<PlaygroundSettings>>(SETTINGS_KEY, {})
   const rawReasoningEffort = stored.reasoningEffort as string | undefined
   const migratedReasoningEffort = rawReasoningEffort === 'light' ? 'low' : rawReasoningEffort
-  const storedReasoningEffort = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'].includes(migratedReasoningEffort ?? '')
+  const storedReasoningEffort = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'].includes(migratedReasoningEffort ?? '')
     ? migratedReasoningEffort as PlaygroundSettings['reasoningEffort']
     : defaults.reasoningEffort
   return { ...defaults, ...stored, reasoningEffort: storedReasoningEffort }

@@ -93,6 +93,8 @@
     "noModels": "利用可能なモデルがありません"
   },
   "effort": {
+    "none": "オフ",
+    "minimal": "極低",
     "low": "低",
     "medium": "中",
     "high": "高",

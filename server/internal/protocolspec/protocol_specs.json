@@ -85,10 +85,24 @@
           "service_tier"
         ],
         "validation": {
-          "temperature": {"type": "number", "min": 0, "max": 2},
-          "top_p": {"type": "number", "min": 0, "max": 1},
-          "max_tokens": {"type": "integer", "min": 1},
-          "max_completion_tokens": {"type": "integer", "min": 1}
+          "temperature": {
+            "type": "number",
+            "min": 0,
+            "max": 2
+          },
+          "top_p": {
+            "type": "number",
+            "min": 0,
+            "max": 1
+          },
+          "max_tokens": {
+            "type": "integer",
+            "min": 1
+          },
+          "max_completion_tokens": {
+            "type": "integer",
+            "min": 1
+          }
         }
       },
       "capabilities": {
@@ -272,9 +286,20 @@
           "service_tier"
         ],
         "validation": {
-          "temperature": {"type": "number", "min": 0, "max": 2},
-          "top_p": {"type": "number", "min": 0, "max": 1},
-          "max_output_tokens": {"type": "integer", "min": 1}
+          "temperature": {
+            "type": "number",
+            "min": 0,
+            "max": 2
+          },
+          "top_p": {
+            "type": "number",
+            "min": 0,
+            "max": 1
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "min": 1
+          }
         }
       },
       "capabilities": {
@@ -430,10 +455,24 @@
           "output_config"
         ],
         "validation": {
-          "temperature": {"type": "number", "min": 0, "max": 1},
-          "top_p": {"type": "number", "min": 0, "max": 1},
-          "top_k": {"type": "integer", "min": 1},
-          "max_tokens": {"type": "integer", "min": 1}
+          "temperature": {
+            "type": "number",
+            "min": 0,
+            "max": 1
+          },
+          "top_p": {
+            "type": "number",
+            "min": 0,
+            "max": 1
+          },
+          "top_k": {
+            "type": "integer",
+            "min": 1
+          },
+          "max_tokens": {
+            "type": "integer",
+            "min": 1
+          }
         }
       },
       "capabilities": {
@@ -697,12 +736,12 @@
         "reasoning_summary": "metadata"
       }
     },
-  "anthropic": {
-    "protocol": "anthropic_messages",
-    "official_base_url": "https://api.anthropic.com",
-    "documentation": [
-      "https://docs.anthropic.com/en/docs/about-claude/models",
-      "https://docs.anthropic.com/en/api/messages"
+    "anthropic": {
+      "protocol": "anthropic_messages",
+      "official_base_url": "https://api.anthropic.com",
+      "documentation": [
+        "https://docs.anthropic.com/en/docs/about-claude/models",
+        "https://docs.anthropic.com/en/api/messages"
       ],
       "request_params": {
         "defaults": {
@@ -1051,8 +1090,238 @@
         "text_format": true,
         "tool_calls": true
       },
+      "reasoning_effort": {
+        "levels": [
+          "none",
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "default": "medium"
+      },
       "documentation": [
-        "https://platform.openai.com/docs/models"
+        "https://platform.openai.com/docs/models",
+        "https://developers.openai.com/api/docs/guides/reasoning"
+      ]
+    },
+    "gpt-5.6*": {
+      "provider": "openai",
+      "request_params": {
+        "supported": [
+          "model",
+          "input",
+          "messages",
+          "instructions",
+          "stream",
+          "stream_options",
+          "tools",
+          "tool_choice",
+          "parallel_tool_calls",
+          "text",
+          "reasoning",
+          "include",
+          "store",
+          "metadata",
+          "service_tier"
+        ]
+      },
+      "capabilities": {
+        "reasoning_summary": true,
+        "text_format": true,
+        "tool_calls": true
+      },
+      "reasoning_effort": {
+        "levels": [
+          "none",
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "default": "medium"
+      },
+      "documentation": [
+        "https://platform.openai.com/docs/models",
+        "https://developers.openai.com/api/docs/guides/reasoning"
+      ]
+    },
+    "gpt-5.6-sol": {
+      "provider": "openai",
+      "request_params": {
+        "supported": [
+          "model",
+          "input",
+          "messages",
+          "instructions",
+          "stream",
+          "stream_options",
+          "tools",
+          "tool_choice",
+          "parallel_tool_calls",
+          "text",
+          "reasoning",
+          "include",
+          "store",
+          "metadata",
+          "service_tier"
+        ]
+      },
+      "capabilities": {
+        "reasoning_summary": true,
+        "text_format": true,
+        "tool_calls": true
+      },
+      "reasoning_effort": {
+        "levels": [
+          "none",
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max",
+          "ultra"
+        ],
+        "default": "medium"
+      },
+      "documentation": [
+        "https://platform.openai.com/docs/models",
+        "https://developers.openai.com/api/docs/guides/reasoning"
+      ]
+    },
+    "gpt-5.6-terra": {
+      "provider": "openai",
+      "request_params": {
+        "supported": [
+          "model",
+          "input",
+          "messages",
+          "instructions",
+          "stream",
+          "stream_options",
+          "tools",
+          "tool_choice",
+          "parallel_tool_calls",
+          "text",
+          "reasoning",
+          "include",
+          "store",
+          "metadata",
+          "service_tier"
+        ]
+      },
+      "capabilities": {
+        "reasoning_summary": true,
+        "text_format": true,
+        "tool_calls": true
+      },
+      "reasoning_effort": {
+        "levels": [
+          "none",
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max",
+          "ultra"
+        ],
+        "default": "medium"
+      },
+      "documentation": [
+        "https://platform.openai.com/docs/models",
+        "https://developers.openai.com/api/docs/guides/reasoning"
+      ]
+    },
+    "gpt-6*": {
+      "provider": "openai",
+      "request_params": {
+        "supported": [
+          "model",
+          "input",
+          "messages",
+          "instructions",
+          "stream",
+          "stream_options",
+          "tools",
+          "tool_choice",
+          "parallel_tool_calls",
+          "text",
+          "reasoning",
+          "include",
+          "store",
+          "metadata",
+          "service_tier"
+        ]
+      },
+      "capabilities": {
+        "reasoning_summary": true,
+        "text_format": true,
+        "tool_calls": true
+      },
+      "reasoning_effort": {
+        "levels": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "default": "medium",
+        "thinking_mandatory": true
+      },
+      "documentation": [
+        "https://platform.openai.com/docs/models",
+        "https://developers.openai.com/api/docs/guides/reasoning"
+      ]
+    },
+    "gpt-6-astra": {
+      "provider": "openai",
+      "request_params": {
+        "supported": [
+          "model",
+          "input",
+          "messages",
+          "instructions",
+          "stream",
+          "stream_options",
+          "tools",
+          "tool_choice",
+          "parallel_tool_calls",
+          "text",
+          "reasoning",
+          "include",
+          "store",
+          "metadata",
+          "service_tier"
+        ]
+      },
+      "capabilities": {
+        "reasoning_summary": true,
+        "text_format": true,
+        "tool_calls": true
+      },
+      "reasoning_effort": {
+        "levels": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max",
+          "ultra"
+        ],
+        "default": "medium",
+        "thinking_mandatory": true
+      },
+      "documentation": [
+        "https://platform.openai.com/docs/models",
+        "https://developers.openai.com/api/docs/guides/reasoning"
       ]
     },
     "gpt-4.1*": {
@@ -1107,6 +1376,69 @@
         "https://platform.openai.com/docs/models"
       ]
     },
+    "claude-opus-5*": {
+      "provider": "anthropic",
+      "capabilities": {
+        "thinking": true,
+        "thinking_signature": true,
+        "tool_calls": true
+      },
+      "reasoning_effort": {
+        "levels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "default": "high"
+      },
+      "documentation": [
+        "https://docs.anthropic.com/en/docs/about-claude/models",
+        "https://platform.claude.com/docs/en/build-with-claude/effort"
+      ]
+    },
+    "claude-opus-4-5*": {
+      "provider": "anthropic",
+      "capabilities": {
+        "thinking": true,
+        "thinking_signature": true,
+        "tool_calls": true
+      },
+      "reasoning_effort": {
+        "levels": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "default": "high"
+      },
+      "documentation": [
+        "https://docs.anthropic.com/en/docs/about-claude/models",
+        "https://platform.claude.com/docs/en/build-with-claude/effort"
+      ]
+    },
+    "claude-opus-4-6*": {
+      "provider": "anthropic",
+      "capabilities": {
+        "thinking": true,
+        "thinking_signature": true,
+        "tool_calls": true
+      },
+      "reasoning_effort": {
+        "levels": [
+          "low",
+          "medium",
+          "high",
+          "max"
+        ],
+        "default": "high"
+      },
+      "documentation": [
+        "https://docs.anthropic.com/en/docs/about-claude/models",
+        "https://platform.claude.com/docs/en/build-with-claude/effort"
+      ]
+    },
     "claude-opus-4*": {
       "provider": "anthropic",
       "capabilities": {
@@ -1114,9 +1446,40 @@
         "thinking_signature": true,
         "tool_calls": true
       },
+      "reasoning_effort": {
+        "levels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "default": "high"
+      },
       "documentation": [
         "https://docs.anthropic.com/en/docs/about-claude/models",
-        "https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking"
+        "https://platform.claude.com/docs/en/build-with-claude/effort"
+      ]
+    },
+    "claude-sonnet-4-6*": {
+      "provider": "anthropic",
+      "capabilities": {
+        "thinking": true,
+        "thinking_signature": true,
+        "tool_calls": true
+      },
+      "reasoning_effort": {
+        "levels": [
+          "low",
+          "medium",
+          "high",
+          "max"
+        ],
+        "default": "high"
+      },
+      "documentation": [
+        "https://docs.anthropic.com/en/docs/about-claude/models",
+        "https://platform.claude.com/docs/en/build-with-claude/effort"
       ]
     },
     "claude-sonnet-4*": {
@@ -1138,9 +1501,19 @@
         "thinking_signature": true,
         "tool_calls": true
       },
+      "reasoning_effort": {
+        "levels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "default": "high"
+      },
       "documentation": [
         "https://docs.anthropic.com/en/docs/about-claude/models",
-        "https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking"
+        "https://platform.claude.com/docs/en/build-with-claude/effort"
       ]
     },
     "claude-haiku-4*": {
@@ -1162,9 +1535,20 @@
         "thinking_signature": true,
         "tool_calls": true
       },
+      "reasoning_effort": {
+        "levels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "default": "high",
+        "thinking_mandatory": true
+      },
       "documentation": [
         "https://docs.anthropic.com/en/docs/about-claude/models",
-        "https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking"
+        "https://platform.claude.com/docs/en/build-with-claude/effort"
       ]
     },
     "claude-3-7*": {
@@ -1208,6 +1592,43 @@
       "documentation": [
         "https://ai.google.dev/gemini-api/docs/models",
         "https://ai.google.dev/gemini-api/docs/thinking"
+      ]
+    },
+    "glm-5.3*": {
+      "provider": "zhipu",
+      "capabilities": {
+        "tool_calls": true,
+        "reasoning_summary": true
+      },
+      "reasoning_effort": {
+        "levels": [
+          "low",
+          "high",
+          "max"
+        ],
+        "default": "max",
+        "thinking_mandatory": true
+      },
+      "documentation": [
+        "https://docs.bigmodel.cn/cn/guide/models/text/glm-5.3"
+      ]
+    },
+    "glm-5.2*": {
+      "provider": "zhipu",
+      "capabilities": {
+        "tool_calls": true,
+        "reasoning_summary": true
+      },
+      "reasoning_effort": {
+        "levels": [
+          "none",
+          "high",
+          "max"
+        ],
+        "default": "high"
+      },
+      "documentation": [
+        "https://docs.bigmodel.cn/cn/guide/models/text/glm-5.2"
       ]
     },
     "glm-5*": {
@@ -1418,6 +1839,16 @@
         "anthropic_messages": true,
         "strict_tools_beta": true
       },
+      "reasoning_effort": {
+        "levels": [
+          "none",
+          "low",
+          "high",
+          "max"
+        ],
+        "default": "high",
+        "mode": "passthrough"
+      },
       "documentation": [
         "https://api-docs.deepseek.com/zh-cn/guides/thinking_mode",
         "https://api-docs.deepseek.com/zh-cn/guides/tool_calls",
@@ -1611,8 +2042,18 @@
         "thinking_roundtrip": true,
         "anthropic_messages": true
       },
+      "reasoning_effort": {
+        "levels": [
+          "low",
+          "high",
+          "max"
+        ],
+        "default": "max",
+        "thinking_mandatory": true
+      },
       "documentation": [
-        "https://www.kimi.com/code/docs/kimi-code/models.html"
+        "https://www.kimi.com/code/docs/kimi-code/models.html",
+        "https://platform.kimi.com/docs/guide/use-reasoning-effort"
       ]
     },
     "kimi-k3*": {
@@ -1623,8 +2064,18 @@
         "thinking_roundtrip": true,
         "anthropic_messages": true
       },
+      "reasoning_effort": {
+        "levels": [
+          "low",
+          "high",
+          "max"
+        ],
+        "default": "max",
+        "thinking_mandatory": true
+      },
       "documentation": [
-        "https://www.kimi.com/code/docs/kimi-code/models.html"
+        "https://www.kimi.com/code/docs/kimi-code/models.html",
+        "https://platform.kimi.com/docs/guide/use-reasoning-effort"
       ]
     },
     "kimi-for-coding*": {
