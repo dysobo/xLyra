@@ -86,13 +86,39 @@ describe('image conversation storage', () => {
       createdAt: 1,
       updatedAt: 1,
       serverPersisted: true,
+      lastOrdinal: 7,
+      activeRun: { id: 'run-1', status: 'running' },
     }]))
 
     const [conversation] = await loadImageConversationsAsync()
 
     expect(isUUID(conversation.id)).toBe(true)
     expect(conversation.serverPersisted).toBe(false)
+    expect(conversation.lastOrdinal).toBeUndefined()
+    expect(conversation.activeRun).toBeUndefined()
     expect(conversation.entries[0].id).toBe('entry-1')
     expect(values.has('xlyra-playground-image-conversations')).toBe(false)
+  })
+
+  it('keeps valid UUID image conversations unchanged', async () => {
+    const id = '123e4567-e89b-42d3-a456-426614174000'
+    const records = installIndexedDB({
+      'image-conversations': [{
+        id,
+        title: 'Stored image',
+        entries: [],
+        createdAt: 1,
+        updatedAt: 1,
+        serverPersisted: true,
+        lastOrdinal: 7,
+      }],
+    })
+
+    const [conversation] = await loadImageConversationsAsync()
+
+    expect(conversation.id).toBe(id)
+    expect(conversation.serverPersisted).toBe(true)
+    expect(conversation.lastOrdinal).toBe(7)
+    expect(records.get('image-conversations')).toMatchObject([{ id, serverPersisted: true }])
   })
 })
