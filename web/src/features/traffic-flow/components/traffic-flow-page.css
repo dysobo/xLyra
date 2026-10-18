@@ -336,6 +336,7 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
+  /* Appearance follows traffic-flow-surface; keep light scheme for fork theme */
   color-scheme: light;
   color: var(--label-primary);
   font-family: var(--font-sans);
