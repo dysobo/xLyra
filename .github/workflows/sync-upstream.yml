@@ -1,9 +1,8 @@
 name: Sync from Upstream
 
-# 定时把 Yachiyo-5i/xLyra 合进本 fork：
-# - main：与上游 main 硬同步（本 fork 不在 main 上叠主题）
-# - test：merge 上游 test，保留浅色主题等本地提交；冲突则开 Issue 人工处理
-# 合进 test 成功后会触发 Publish Images → Watchtower 可拉新镜像
+# 定时把 Yachiyo-5i/xLyra 的 test 合进本 fork 的 test（保留浅色主题等本地提交）。
+# 成功推送 test 后会触发 Publish Images → GHCR → 1panel Watchtower。
+# 不硬同步 main，避免冲掉本 fork 放在默认分支上的 CI 工作流。
 
 on:
   schedule:
@@ -12,7 +11,7 @@ on:
 
 permissions:
   contents: write
-  issues: write
+  pull-requests: write
 
 concurrency:
   group: sync-upstream
@@ -20,7 +19,7 @@ concurrency:
 
 jobs:
   sync:
-    name: Sync upstream into fork
+    name: Sync upstream/test into test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,6 +27,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          ref: test
 
       - name: Configure git
         run: |
@@ -37,20 +37,15 @@ jobs:
       - name: Fetch upstream
         run: |
           git remote add upstream https://github.com/Yachiyo-5i/xLyra.git
-          git fetch upstream --tags
-          git fetch origin
-
-      - name: Sync main (hard reset to upstream/main)
-        run: |
-          git checkout -B main origin/main 2>/dev/null || git checkout -B main
-          git reset --hard upstream/main
-          git push origin main --force
+          git fetch upstream test
+          git fetch origin test
 
       - name: Merge upstream/test into test
         id: merge
         run: |
           set -euo pipefail
-          git checkout -B test origin/test
+          git checkout test
+          git reset --hard origin/test
           before="$(git rev-parse HEAD)"
           if git merge-base --is-ancestor upstream/test HEAD; then
             echo "already_up_to_date=true" >> "$GITHUB_OUTPUT"
@@ -62,8 +57,6 @@ jobs:
             git push origin test
             echo "already_up_to_date=false" >> "$GITHUB_OUTPUT"
             echo "merged=true" >> "$GITHUB_OUTPUT"
-            echo "before=$before" >> "$GITHUB_OUTPUT"
-            echo "after=$after" >> "$GITHUB_OUTPUT"
             echo "Merged upstream/test into test: $before -> $after"
           else
             git merge --abort || true
@@ -72,47 +65,23 @@ jobs:
             exit 1
           fi
 
-      - name: Open issue on merge conflict
+      - name: Open PR on merge conflict
         if: failure() && steps.merge.outputs.conflict == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const title = '上游 sync 冲突：无法自动 merge upstream/test → test'
-            const body = [
-              '定时同步失败：`upstream/test` 与本 fork 的 `test`（含浅色主题等改动）有冲突。',
-              '',
-              '请本地处理：',
-              '```bash',
-              'git fetch upstream',
-              'git checkout test',
-              'git merge upstream/test',
-              '# 解决冲突后',
-              'git push origin test',
-              '```',
-              '',
-              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-            ].join('\n')
-            const issues = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'upstream-sync',
-              per_page: 5,
-            })
-            const existing = issues.data.find((i) => i.title === title)
-            if (existing) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: existing.number,
-                body: `再次冲突：${new Date().toISOString()}\n\n${body}`,
-              })
-            } else {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title,
-                body,
-                labels: ['upstream-sync'],
-              })
-            }
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch="sync/upstream-test-$(date -u +%Y%m%d)"
+          git checkout -B "$branch" origin/test
+          # 留下冲突标记分支，便于人工处理
+          git fetch upstream test
+          git merge upstream/test || true
+          git add -A
+          git commit -m "wip: conflict merging upstream/test" || true
+          git push -u origin "$branch" --force
+          gh pr create \
+            --base test \
+            --head "$branch" \
+            --title "上游 sync 冲突：请手动合并 upstream/test" \
+            --body "定时同步失败，已推送冲突分支 \`$branch\`。请在 PR 中解决后合并到 \`test\`，合并后会自动发布镜像。" \
+            || true
