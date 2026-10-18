@@ -6,6 +6,13 @@ import { mulberry32 } from '@/features/auth/components/lyra-sky-layers'
  * 全局背景（L0）：
  * - 主站：纸感网格（index.css .ambient-background）
  * - Agent：上游原版星空（保持暗色岛观感）
+ *
+ * 星空设计取舍：星点不抢戏。
+ * - 全是 1 个物理像素大小的细点，亮度很低且偏暗的占绝大多数；没有光晕、没有“亮星”，
+ *   背景被提亮靠的是这些细点的整体密度，而不是某几颗星的光；
+ * - 用抖动网格撒点，避免随机撒点常见的“一簇一簇”和空洞，看起来是均匀的细碎星尘；
+ * - 密度由一张很缓的低频场调制，并且靠近窗口边缘更密、中央更疏：内容大多压在中央，文字附近尽量干净；
+ * - 只在挂载和窗口尺寸变化时画一次，之后没有任何逐帧开销。
  */
 
 const TINTS = ['226,232,255', '226,232,255', '236,240,255', '208,222,255', '255,244,228']
@@ -32,8 +39,8 @@ function StarfieldAmbient() {
 
       const random = mulberry32(20261018)
       const waves = Array.from({ length: 3 }, () => ({
-        fx: (0.6 + random() * 1.4) / Math.max(width, 1) * Math.PI * 2,
-        fy: (0.6 + random() * 1.4) / Math.max(height, 1) * Math.PI * 2,
+        fx: ((0.6 + random() * 1.4) / Math.max(width, 1)) * Math.PI * 2,
+        fy: ((0.6 + random() * 1.4) / Math.max(height, 1)) * Math.PI * 2,
         px: random() * Math.PI * 2,
         py: random() * Math.PI * 2,
       }))
@@ -48,7 +55,9 @@ function StarfieldAmbient() {
           const size = random()
 
           let field = 0
-          for (const wave of waves) field += 0.5 + 0.5 * Math.sin(x * wave.fx + wave.px) * Math.sin(y * wave.fy + wave.py)
+          for (const wave of waves) {
+            field += 0.5 + 0.5 * Math.sin(x * wave.fx + wave.px) * Math.sin(y * wave.fy + wave.py)
+          }
           field /= waves.length
           const dx = (x / width - 0.5) * 2
           const dy = (y / height - 0.5) * 2
@@ -58,8 +67,7 @@ function StarfieldAmbient() {
 
           const alpha = 0.07 + brightness ** 2.4 * 0.36
           const radius = size > 0.96 ? onePixel * 1.7 : Math.max(onePixel, 0.55)
-          context.fillStyle = 
-gba(, )
+          context.fillStyle = `rgba(${tint}, ${alpha.toFixed(3)})`
           context.beginPath()
           context.arc(x, y, radius, 0, Math.PI * 2)
           context.fill()
@@ -81,8 +89,8 @@ gba(, )
   }, [])
 
   return (
-    <div className=ambient-background aria-hidden=true>
-      <canvas ref={canvasRef} className=size-full />
+    <div className="ambient-background" aria-hidden="true">
+      <canvas ref={canvasRef} className="size-full" />
     </div>
   )
 }
@@ -91,5 +99,5 @@ export function AmbientBackground() {
   const location = useLocation()
   const isAgentWorkspace = location.pathname === '/agent' || location.pathname.startsWith('/agent/')
   if (isAgentWorkspace) return <StarfieldAmbient />
-  return <div className=ambient-background aria-hidden=true />
+  return <div className="ambient-background" aria-hidden="true" />
 }
