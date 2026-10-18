@@ -566,6 +566,172 @@ tr:hover > .table-sticky-end {
   background-color: #f8fbfc;
 }
 
+/* ==========================================================================
+   Dark islands: Agent + Traffic Flow keep upstream night UI
+   (rest of app stays paper-light)
+   ========================================================================== */
+body:has(.agent-page),
+body:has(.traffic-flow-page) {
+
+  color-scheme: dark;
+
+  /* ---- 新语义 token ---- */
+  --bg-base: #11131a;
+  --bg-elevated-1: #181b22;
+  --bg-elevated-2: #1f222a;
+  --bg-elevated-3: #282b34;
+
+  --label-primary: rgb(255 255 255 / 0.95);
+  --label-secondary: rgb(235 235 245 / 0.68);
+  --label-tertiary: rgb(235 235 245 / 0.44);
+  --label-quaternary: rgb(235 235 245 / 0.2);
+
+  --fill-primary: rgb(255 255 255 / 0.14);
+  --fill-secondary: rgb(255 255 255 / 0.1);
+  --fill-tertiary: rgb(255 255 255 / 0.07);
+  --fill-quaternary: rgb(255 255 255 / 0.045);
+  --separator: rgb(255 255 255 / 0.07);
+  --separator-opaque: #2a2d35;
+
+  /* 组件顶光：从顶边往下 160px 内淡出；描边顶边亮、往下变暗 */
+  --top-light: linear-gradient(180deg, rgb(255 255 255 / 0.028), rgb(255 255 255 / 0.01) 64px, rgb(255 255 255 / 0) 160px);
+  /* 内容层（卡片、表格容器、输入框）：半透明提亮 + 发丝线，不带阴影和模糊 */
+  --surface-line: rgb(255 255 255 / 0.085);
+  --surface-edge: inset 0 1px 0 rgb(255 255 255 / 0.055);
+
+  /* 强调色：主按钮背景、选中态、焦点环。浅色底，所以前景（按钮文字）用深色 */
+  --tint: #e7ebf3;
+  --tint-foreground: #1c1c1e;
+  --system-blue: #0a84ff;
+  --system-green: #30d158;
+  --system-red: #ff453a;
+  --system-orange: #ff9f0a;
+  --system-yellow: #ffd60a;
+  --system-teal: #40c8e0;
+  --system-indigo: #5e5ce6;
+  --system-purple: #bf5af2;
+  --system-pink: #ff375f;
+  --system-gray: #8e8e93;
+
+  --chart-1: var(--system-blue);
+  --chart-2: var(--system-teal);
+  --chart-3: var(--system-green);
+  --chart-4: var(--system-orange);
+  --chart-5: var(--system-purple);
+  --chart-6: var(--system-pink);
+  --chart-7: var(--system-yellow);
+  --chart-8: var(--system-indigo);
+
+  /* 控件高度：按钮、输入框共用；移动端在下方媒体查询中放大 */
+  --control-h-sm: 32px;
+  --control-h: 36px;
+  --control-h-lg: 44px;
+  /* Switch：桌面 40×24，移动端为 iOS 标准 51×31 */
+  --switch-w: 40px;
+  --switch-h: 24px;
+  /* Checkbox / Radio 边长 */
+  --check-size: 18px;
+
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ---- 旧 token 别名（HSL 三元组，格式与旧版保持一致；过渡期使用） ---- */
+  --background: 227 21% 8.4%;
+  --foreground: 240 20% 97%;
+  --card: 228 12% 8.5%;
+  --card-foreground: 240 20% 97%;
+  --popover: 230 10% 11.4%;
+  --popover-foreground: 240 20% 97%;
+  --primary: 220 33% 93%;
+  --primary-foreground: 220 13% 4.5%;
+  --secondary: 230 10% 11.4%;
+  --secondary-foreground: 240 20% 97%;
+  --muted: 230 10% 11.4%;
+  --muted-foreground: 240 6% 66%;
+  --accent: 220 33% 93%;
+  --accent-foreground: 220 13% 4.5%;
+  --destructive: 3 100% 61%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 100% / 0.08;
+  --input: 0 0% 100% / 0.07;
+  --ring: 220 33% 93%;
+  --ring-soft: 220 33% 93% / 0.16;
+  --ring-strong: 220 33% 93% / 0.42;
+  --surface-base: 227 21% 8.4%;
+  --surface-panel: 228 12% 8.5%;
+  --surface-elevated: 230 10% 11% / 0.82;
+  --surface-field: 0 0% 100% / 0.07;
+  --surface-selected: 230 8% 16%;
+  --surface-soft: 228 12% 8.5% / 0.72;
+  --surface-soft-hover: 230 10% 13% / 0.8;
+  --surface-subtle: 0 0% 100% / 0.07;
+  --surface-strong: 228 12% 8.5% / 0.88;
+  --glass-border: 0 0% 100% / 0.08;
+  --glass-border-strong: 0 0% 100% / 0.14;
+  --glass-divider: 0 0% 100% / 0.07;
+  --shell-border: 0 0% 100% / 0.07;
+  --field-border-focus: 220 33% 93% / 0.45;
+  --input-placeholder: 240 4% 46%;
+  --text-muted-soft: 230 8% 70%;
+  --text-faint: 240 4% 50%;
+  --ambient-left: 220 13% 4.5%;
+  --ambient-right: 220 13% 4.5%;
+  --ambient-base: 220 13% 4.5%;
+  --ambient-bottom: 220 13% 4.5%;
+  --badge-neutral-bg: 0 0% 100% / 0.07;
+  --badge-neutral-border: 0 0% 100% / 0.1;
+  --badge-neutral-text: 240 8% 86%;
+  --badge-success-bg: 135 64% 50% / 0.16;
+  --badge-success-border: 135 64% 50% / 0.28;
+  --badge-success-text: 135 70% 70%;
+  --badge-info-bg: 210 100% 52% / 0.16;
+  --badge-info-border: 210 100% 52% / 0.3;
+  --badge-info-text: 210 100% 76%;
+  --badge-warning-bg: 36 100% 52% / 0.16;
+  --badge-warning-border: 36 100% 52% / 0.3;
+  --badge-warning-text: 36 100% 72%;
+  --badge-accent-bg: 220 33% 93% / 0.12;
+  --badge-accent-border: 220 33% 93% / 0.22;
+  --badge-accent-text: 220 33% 93%;
+  --request-tpm-badge-bg: 280 85% 65% / 0.16;
+  --request-tpm-badge-border: 280 85% 65% / 0.3;
+  --request-tpm-badge-text: 280 100% 86%;
+  --request-failover-badge-bg: 220 14% 72% / 0.1;
+  --request-failover-badge-border: 220 14% 72% / 0.18;
+  --request-failover-badge-text: 220 14% 76%;
+  --button-soft-border: 0 0% 100% / 0;
+  --button-soft-shadow: 0 0 #0000;
+  --button-secondary-border: 0 0% 100% / 0.1;
+  --button-secondary-shadow: 0 0 #0000;
+  --button-hover-shadow: 0 0 #0000;
+  --button-hover-translate: 0px;
+  --card-hover-shadow: 0 0 #0000;
+  --card-hover-translate: 0px;
+  --switch-checked-shadow: 0 0 0 4px hsl(var(--ring-soft));
+  --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.45);
+  --dialog-surface: 230 10% 11% / 0.72;
+  --dialog-overlay: 0 0 0 / 0.45;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* radii / font match upstream night UI */
+  --radius-shell: 24px;
+  --radius-card: 20px;
+  --radius-inner: 12px;
+  --radius-control: 10px;
+  --radius-small: 6px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC",
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK SC", "Microsoft YaHei UI", "Segoe UI",
+    sans-serif;
+  --grid-line: transparent;
+}
+
 /* 背景（L0）：纸感底 + 淡网格（对齐 img.dysobo.work） */
 .ambient-background {
   content: "";
