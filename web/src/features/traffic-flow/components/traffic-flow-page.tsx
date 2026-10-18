@@ -3,7 +3,6 @@ import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import { ProtectedRoute } from '@/components/auth/auth-guard'
-import { LyraSky } from '@/features/auth/components/lyra-sky'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/common/status-badge'
 import { useMobileDevice, useMobileLayout } from '@/hooks/use-media-query'
@@ -54,8 +53,6 @@ function TrafficFlowPage() {
 
   return (
     <main ref={setPageEl} className={tokensOpen ? 'traffic-flow-page is-tokens-open' : 'traffic-flow-page'}>
-      <LyraSky constellation={false} placement="wide" className="traffic-flow-starfield" />
-
       <header className="traffic-flow-header traffic-flow-surface">
         <Button type="button" variant="ghost" size="sm" className="traffic-flow-brand" onClick={() => navigate('/dashboard')}>
           <ArrowLeft className="size-4" />

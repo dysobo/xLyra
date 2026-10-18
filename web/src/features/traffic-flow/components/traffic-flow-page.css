@@ -30,20 +30,23 @@
     "footer footer";
   gap: var(--flow-space-3) var(--flow-space-4);
   padding: 16px 20px 12px;
-  color-scheme: dark;
+  color-scheme: light;
   color: var(--flow-ink);
-  background: var(--bg-base);
+  background-color: var(--bg-base);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: -1px -1px;
   font-family: var(--font-sans);
 }
-.traffic-flow-starfield { z-index: -3; }
 
-/* 全页唯一的面：顶栏、KPI、舞台、右侧栏共用。
-   不做模糊、不做投影，只有一层极淡的提亮和一圈发丝线，星空直接透过每一块面板，整页像一层 HUD 浮在夜空上。 */
+/* 面板：白底 + 细线边框（纸感） */
 .traffic-flow-surface {
   border: 1px solid var(--separator);
   border-radius: var(--radius-card);
-  background: rgb(255 255 255 / .03);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / .05);
+  background: var(--bg-elevated-1);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 1);
 }
 
 .traffic-flow-desktop-required { position: relative; display: grid; width: 100vw; height: 100dvh; overflow: hidden; place-items: center; padding: 28px; color: var(--label-primary); background: var(--bg-base); font-family: var(--font-sans); }
@@ -324,7 +327,7 @@
 .traffic-flow-page.is-tokens-open .traffic-flow-kpis { z-index: 60; }
 .traffic-flow-page.is-tokens-open .traffic-flow-metric.is-interactive[aria-expanded="true"] { z-index: 61; }
 
-.traffic-flow-tokens-overlay { position: absolute; inset: 0; background: rgb(0 0 0 / .32); backdrop-filter: blur(6px); }
+.traffic-flow-tokens-overlay { position: absolute; inset: 0; background: rgb(24 32 43 / .28); backdrop-filter: blur(4px); }
 .traffic-flow-tokens-overlay[data-state="open"] { animation: traffic-flow-tokens-dim 200ms ease-out; }
 
 .traffic-flow-tokens-dialog {
@@ -333,7 +336,7 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
-  color-scheme: dark;
+  color-scheme: light;
   color: var(--label-primary);
   font-family: var(--font-sans);
 }

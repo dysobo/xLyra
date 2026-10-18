@@ -14,6 +14,16 @@
   font-display: swap;
 }
 
+/* UI 正文字体：Archivo（与 img.dysobo.work 同源），拉丁范围；中文回退系统栈 */
+@font-face {
+  font-family: Archivo;
+  src: url("./assets/fonts/archivo.woff2") format("woff2");
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+2000-206F, U+20AC, U+2122, U+2190-2193;
+}
+
 @keyframes sheet-overlay-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -79,10 +89,11 @@
 
 /* 工具栏变形菜单（components/layout/morph-toolbar.tsx）关闭时被吸回按钮的小液滴 */
 .morph-drip {
-  background: rgb(24 26 33 / 0.6);
+  background: rgb(255 255 255 / 0.92);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.08),
-    0 4px 10px rgb(0 0 0 / 0.24);
+    inset 0 1px 0 rgb(255 255 255 / 1),
+    0 4px 12px rgb(24 32 43 / 0.12);
+  border: 1px solid var(--separator);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
@@ -208,10 +219,9 @@ html[data-standalone='true'] .mobile-dock-anchor {
 
 /* 字号、圆角、字体：非 inline，工具类引用 var()，移动端可在 :root 中覆盖 */
 @theme {
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC",
-    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK SC", "Microsoft YaHei UI", "Segoe UI",
-    sans-serif;
-  /* 标题：拉丁字符用 Literata，中文（含日文假名）用思源宋体 */
+  --font-sans: Archivo, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei UI", "Noto Sans CJK SC",
+    system-ui, sans-serif;
+  /* 字标：拉丁用 Literata，中文用思源宋体 */
   --font-serif: "Literata Variable", "Noto Serif SC Variable", "Songti SC", Georgia, serif;
   /* 代码与数字：JetBrains Mono；其中的中文回退到系统无衬线字体 */
   --font-mono: "JetBrains Mono Variable", "SF Mono", ui-monospace, Menlo, "PingFang SC", Consolas, monospace;
@@ -250,159 +260,159 @@ html[data-standalone='true'] .mobile-dock-anchor {
   --text-kpi--line-height: 34px;
   --text-kpi--font-weight: 600;
 
-  --radius-shell: 24px;
-  --radius-card: 20px;
-  --radius-inner: 12px;
-  --radius-control: 10px;
-  --radius-small: 6px;
+  /* 纸感工具站：收紧圆角（对齐 img.dysobo.work） */
+  --radius-shell: 6px;
+  --radius-card: 6px;
+  --radius-inner: 4px;
+  --radius-control: 3px;
+  --radius-small: 3px;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  /* ---- 新语义 token ---- */
-  --bg-base: #11131a;
-  --bg-elevated-1: #181b22;
-  --bg-elevated-2: #1f222a;
-  --bg-elevated-3: #282b34;
+  /* ---- 新语义 token（纸感浅色，对齐 img.dysobo.work） ---- */
+  --bg-base: #f3f5f7;
+  --bg-elevated-1: #ffffff;
+  --bg-elevated-2: #ffffff;
+  --bg-elevated-3: #f8fbfc;
+  --grid-line: #e6eaee;
 
-  --label-primary: rgb(255 255 255 / 0.95);
-  --label-secondary: rgb(235 235 245 / 0.68);
-  --label-tertiary: rgb(235 235 245 / 0.44);
-  --label-quaternary: rgb(235 235 245 / 0.2);
+  --label-primary: #18202b;
+  --label-secondary: #5f6b7a;
+  --label-tertiary: #8794a3;
+  --label-quaternary: #b4bdc7;
 
-  --fill-primary: rgb(255 255 255 / 0.14);
-  --fill-secondary: rgb(255 255 255 / 0.1);
-  --fill-tertiary: rgb(255 255 255 / 0.07);
-  --fill-quaternary: rgb(255 255 255 / 0.045);
-  --separator: rgb(255 255 255 / 0.07);
-  --separator-opaque: #2a2d35;
+  --fill-primary: rgb(24 32 43 / 0.1);
+  --fill-secondary: rgb(24 32 43 / 0.07);
+  --fill-tertiary: rgb(24 32 43 / 0.045);
+  --fill-quaternary: rgb(24 32 43 / 0.03);
+  --separator: #dce2e8;
+  --separator-opaque: #dce2e8;
 
-  /* 组件顶光：从顶边往下 160px 内淡出；描边顶边亮、往下变暗 */
-  --top-light: linear-gradient(180deg, rgb(255 255 255 / 0.028), rgb(255 255 255 / 0.01) 64px, rgb(255 255 255 / 0) 160px);
-  --rim-light: linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.045) 48px, rgb(255 255 255 / 0.04));
-  /* 内容层（卡片、表格容器、输入框）：半透明提亮 + 发丝线，不带阴影和模糊 */
-  --surface-line: rgb(255 255 255 / 0.085);
-  --surface-edge: inset 0 1px 0 rgb(255 255 255 / 0.055);
+  --top-light: linear-gradient(180deg, rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.4) 64px, rgb(255 255 255 / 0) 160px);
+  --rim-light: linear-gradient(180deg, #dce2e8, #e6eaee 48px, #dce2e8);
+  --surface-line: #dce2e8;
+  --surface-edge: inset 0 1px 0 rgb(255 255 255 / 0.9);
 
-  /* 强调色：主按钮背景、选中态、焦点环。浅色底，所以前景（按钮文字）用深色 */
-  --tint: #e7ebf3;
-  --tint-foreground: #1c1c1e;
-  --system-blue: #0a84ff;
-  --system-green: #30d158;
-  --system-red: #ff453a;
-  --system-orange: #ff9f0a;
-  --system-yellow: #ffd60a;
-  --system-teal: #40c8e0;
-  --system-indigo: #5e5ce6;
-  --system-purple: #bf5af2;
-  --system-pink: #ff375f;
-  --system-gray: #8e8e93;
+  /* 强调色：青绿 sig；主按钮用 ink 时前景为白 */
+  --tint: #0b7f96;
+  --tint-foreground: #ffffff;
+  --sig: #0b7f96;
+  --sig-hi: #22c3e0;
+  --sig-wash: #e3f5f9;
+  --system-blue: #0b7f96;
+  --system-green: #1f8a4c;
+  --system-red: #c2303f;
+  --system-orange: #a86f00;
+  --system-yellow: #e8a800;
+  --system-teal: #22c3e0;
+  --system-indigo: #3d5a80;
+  --system-purple: #6b5b95;
+  --system-pink: #c2305a;
+  --system-gray: #5f6b7a;
 
-  --chart-1: var(--system-blue);
-  --chart-2: var(--system-teal);
-  --chart-3: var(--system-green);
-  --chart-4: var(--system-orange);
-  --chart-5: var(--system-purple);
-  --chart-6: var(--system-pink);
-  --chart-7: var(--system-yellow);
-  --chart-8: var(--system-indigo);
+  --chart-1: #0b7f96;
+  --chart-2: #22c3e0;
+  --chart-3: #1f8a4c;
+  --chart-4: #a86f00;
+  --chart-5: #6b5b95;
+  --chart-6: #c2305a;
+  --chart-7: #e8a800;
+  --chart-8: #3d5a80;
 
-  /* 控件高度：按钮、输入框共用；移动端在下方媒体查询中放大 */
   --control-h-sm: 32px;
   --control-h: 36px;
   --control-h-lg: 44px;
-  /* Switch：桌面 40×24，移动端为 iOS 标准 51×31 */
   --switch-w: 40px;
   --switch-h: 24px;
-  /* Checkbox / Radio 边长 */
   --check-size: 18px;
 
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
 
-  /* ---- 旧 token 别名（HSL 三元组，格式与旧版保持一致；过渡期使用） ---- */
-  --background: 227 21% 8.4%;
-  --foreground: 240 20% 97%;
-  --card: 228 12% 8.5%;
-  --card-foreground: 240 20% 97%;
-  --popover: 230 10% 11.4%;
-  --popover-foreground: 240 20% 97%;
-  --primary: 220 33% 93%;
-  --primary-foreground: 220 13% 4.5%;
-  --secondary: 230 10% 11.4%;
-  --secondary-foreground: 240 20% 97%;
-  --muted: 230 10% 11.4%;
-  --muted-foreground: 240 6% 66%;
-  --accent: 220 33% 93%;
-  --accent-foreground: 220 13% 4.5%;
-  --destructive: 3 100% 61%;
+  /* ---- 旧 token 别名（HSL；浅色映射） ---- */
+  --background: 210 14% 96%;
+  --foreground: 213 28% 13%;
+  --card: 0 0% 100%;
+  --card-foreground: 213 28% 13%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 213 28% 13%;
+  --primary: 190 86% 32%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 14% 96%;
+  --secondary-foreground: 213 28% 13%;
+  --muted: 210 14% 94%;
+  --muted-foreground: 213 12% 42%;
+  --accent: 190 50% 94%;
+  --accent-foreground: 190 86% 28%;
+  --destructive: 353 61% 47%;
   --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 100% / 0.08;
-  --input: 0 0% 100% / 0.07;
-  --ring: 220 33% 93%;
-  --ring-soft: 220 33% 93% / 0.16;
-  --ring-strong: 220 33% 93% / 0.42;
-  --surface-base: 227 21% 8.4%;
-  --surface-panel: 228 12% 8.5%;
-  --surface-elevated: 230 10% 11% / 0.82;
-  --surface-field: 0 0% 100% / 0.07;
-  --surface-selected: 230 8% 16%;
-  --surface-soft: 228 12% 8.5% / 0.72;
-  --surface-soft-hover: 230 10% 13% / 0.8;
-  --surface-subtle: 0 0% 100% / 0.07;
-  --surface-strong: 228 12% 8.5% / 0.88;
-  --glass-border: 0 0% 100% / 0.08;
-  --glass-border-strong: 0 0% 100% / 0.14;
-  --glass-divider: 0 0% 100% / 0.07;
-  --divider: 0 0% 100% / 0.07;
-  --shell-border: 0 0% 100% / 0.07;
-  --field-border-focus: 220 33% 93% / 0.45;
-  --input-placeholder: 240 4% 46%;
-  --icon-soft: 240 5% 62%;
-  --text-muted-soft: 230 8% 70%;
-  --text-subtle: 240 8% 84%;
-  --text-faint: 240 4% 50%;
-  --ambient-left: 220 13% 4.5%;
-  --ambient-right: 220 13% 4.5%;
-  --ambient-base: 220 13% 4.5%;
-  --ambient-bottom: 220 13% 4.5%;
-  --badge-neutral-bg: 0 0% 100% / 0.07;
-  --badge-neutral-border: 0 0% 100% / 0.1;
-  --badge-neutral-text: 240 8% 86%;
-  --badge-success-bg: 135 64% 50% / 0.16;
-  --badge-success-border: 135 64% 50% / 0.28;
-  --badge-success-text: 135 70% 70%;
-  --badge-info-bg: 210 100% 52% / 0.16;
-  --badge-info-border: 210 100% 52% / 0.3;
-  --badge-info-text: 210 100% 76%;
-  --badge-warning-bg: 36 100% 52% / 0.16;
-  --badge-warning-border: 36 100% 52% / 0.3;
-  --badge-warning-text: 36 100% 72%;
-  --badge-accent-bg: 220 33% 93% / 0.12;
-  --badge-accent-border: 220 33% 93% / 0.22;
-  --badge-accent-text: 220 33% 93%;
-  --request-tpm-badge-bg: 280 85% 65% / 0.16;
-  --request-tpm-badge-border: 280 85% 65% / 0.3;
-  --request-tpm-badge-text: 280 100% 86%;
-  --request-failover-badge-bg: 220 14% 72% / 0.1;
-  --request-failover-badge-border: 220 14% 72% / 0.18;
-  --request-failover-badge-text: 220 14% 76%;
-  --button-soft-border: 0 0% 100% / 0;
+  --border: 210 16% 88%;
+  --input: 210 16% 88%;
+  --ring: 190 86% 32%;
+  --ring-soft: 190 70% 88%;
+  --ring-strong: 190 86% 32% / 0.35;
+  --surface-base: 210 14% 96%;
+  --surface-panel: 0 0% 100%;
+  --surface-elevated: 0 0% 100% / 0.92;
+  --surface-field: 0 0% 100%;
+  --surface-selected: 190 50% 94%;
+  --surface-soft: 0 0% 100% / 0.88;
+  --surface-soft-hover: 210 20% 97%;
+  --surface-subtle: 210 14% 94%;
+  --surface-strong: 0 0% 100%;
+  --glass-border: 210 16% 88%;
+  --glass-border-strong: 210 16% 80%;
+  --glass-divider: 210 16% 88%;
+  --divider: 210 16% 88%;
+  --shell-border: 210 16% 88%;
+  --field-border-focus: 190 86% 32% / 0.45;
+  --input-placeholder: 213 12% 55%;
+  --icon-soft: 213 12% 55%;
+  --text-muted-soft: 213 12% 42%;
+  --text-subtle: 213 28% 13%;
+  --text-faint: 213 12% 55%;
+  --ambient-left: 210 14% 96%;
+  --ambient-right: 210 14% 96%;
+  --ambient-base: 210 14% 96%;
+  --ambient-bottom: 210 14% 96%;
+  --badge-neutral-bg: 210 14% 94%;
+  --badge-neutral-border: 210 16% 88%;
+  --badge-neutral-text: 213 12% 35%;
+  --badge-success-bg: 145 40% 92%;
+  --badge-success-border: 145 40% 78%;
+  --badge-success-text: 145 55% 28%;
+  --badge-info-bg: 190 50% 94%;
+  --badge-info-border: 190 50% 82%;
+  --badge-info-text: 190 86% 28%;
+  --badge-warning-bg: 40 80% 94%;
+  --badge-warning-border: 40 70% 78%;
+  --badge-warning-text: 36 80% 28%;
+  --badge-accent-bg: 190 50% 94%;
+  --badge-accent-border: 190 50% 82%;
+  --badge-accent-text: 190 86% 28%;
+  --request-tpm-badge-bg: 270 40% 94%;
+  --request-tpm-badge-border: 270 35% 82%;
+  --request-tpm-badge-text: 270 40% 35%;
+  --request-failover-badge-bg: 210 14% 94%;
+  --request-failover-badge-border: 210 16% 88%;
+  --request-failover-badge-text: 213 12% 42%;
+  --button-soft-border: 210 16% 88%;
   --button-soft-shadow: 0 0 #0000;
-  --button-secondary-border: 0 0% 100% / 0.1;
+  --button-secondary-border: 210 16% 88%;
   --button-secondary-shadow: 0 0 #0000;
   --button-hover-shadow: 0 0 #0000;
   --button-hover-translate: 0px;
   --card-hover-shadow: 0 0 #0000;
   --card-hover-translate: 0px;
-  --switch-checked-shadow: 0 0 0 4px hsl(var(--ring-soft));
-  --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.45);
-  --dialog-surface: 230 10% 11% / 0.72;
-  --dialog-overlay: 0 0 0 / 0.45;
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
+  --switch-checked-shadow: 0 0 0 4px var(--sig-wash);
+  --shadow-dialog: 0 24px 60px rgba(24, 32, 43, 0.18);
+  --dialog-surface: 0 0% 100% / 0.96;
+  --dialog-overlay: 213 28% 13% / 0.32;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -461,7 +471,12 @@ body {
   width: 100%;
   height: var(--app-viewport-height, 100dvh);
   min-height: var(--app-viewport-height, 100dvh);
-  background-color: hsl(var(--surface-base));
+  background-color: var(--bg-base);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: -1px -1px;
   color: hsl(var(--foreground));
   font-family: var(--font-sans);
   position: fixed;
@@ -484,7 +499,12 @@ body[data-scroll-locked] {
   width: 100%;
   height: var(--app-viewport-height, 100dvh);
   min-height: var(--app-viewport-height, 100dvh);
-  background-color: hsl(var(--surface-base));
+  background-color: var(--bg-base);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: -1px -1px;
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -499,17 +519,17 @@ body[data-scroll-locked] {
    下方一层柔和投影；聚焦时描边整体提亮并加一圈强调色外环 */
 .composer-surface {
   border: 1px solid var(--surface-line);
-  background: rgb(255 255 255 / 0.045);
+  background: var(--bg-elevated-1);
   box-shadow: var(--surface-edge);
   transition: box-shadow 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
 
 .composer-surface:focus-within {
-  border-color: rgb(255 255 255 / 0.2);
-  background: rgb(255 255 255 / 0.06);
+  border-color: var(--sig);
+  background: var(--bg-elevated-1);
   box-shadow:
     var(--surface-edge),
-    0 0 0 3px rgb(231 235 243 / 0.08);
+    0 0 0 3px var(--sig-wash);
 }
 
 /* 桌面内容区（components/layout/app-shell.tsx）：「内容 + 页脚」两行网格。
@@ -534,8 +554,8 @@ body[data-scroll-locked] {
   position: sticky;
   right: 0;
   z-index: 1;
-  background-color: rgb(29 31 38);
-  box-shadow: -14px 0 14px -14px rgb(0 0 0 / 0.5);
+  background-color: var(--bg-elevated-1);
+  box-shadow: -14px 0 14px -14px rgb(24 32 43 / 0.12);
 }
 
 thead .table-sticky-end {
@@ -543,16 +563,21 @@ thead .table-sticky-end {
 }
 
 tr:hover > .table-sticky-end {
-  background-color: rgb(38 40 47);
+  background-color: #f8fbfc;
 }
 
-/* 背景（L0）：纯色、不做渐变光与动画。保留独立图层，便于统一调整 */
+/* 背景（L0）：纸感底 + 淡网格（对齐 img.dysobo.work） */
 .ambient-background {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -2;
   background-color: var(--bg-base);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: -1px -1px;
   pointer-events: none;
 }
 
@@ -625,73 +650,53 @@ select {
    WebKit 的 -webkit-backdrop-filter 中自定义属性不生效。
    ========================================================================== */
 
-/* Liquid Glass · regular —— 功能层：侧边栏、工具栏控件组、菜单、Popover、Select 面板、Toast */
+/* 磨砂面板 · regular —— 侧边栏、菜单、Popover、Toast（浅色纸感） */
 .lg-regular {
-  border: 1px solid transparent;
-  background:
-    var(--top-light) padding-box,
-    linear-gradient(rgb(24 26 33 / 0.5), rgb(24 26 33 / 0.5)) padding-box,
-    linear-gradient(160deg, rgb(255 255 255 / 0.16), rgb(255 255 255 / 0.045) 36%, rgb(255 255 255 / 0.025) 64%, rgb(255 255 255 / 0.07)) border-box;
+  border: 1px solid var(--separator);
+  background: rgb(255 255 255 / 0.88);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.06),
-    0 8px 28px rgb(0 0 0 / 0.26);
-  -webkit-backdrop-filter: blur(24px) saturate(150%);
-  backdrop-filter: blur(24px) saturate(150%);
+    inset 0 1px 0 rgb(255 255 255 / 1),
+    0 8px 24px rgb(24 32 43 / 0.1);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
 }
 
-/* Liquid Glass · thick —— 承载大量文字的覆盖层：Dialog、Sheet、Alert、CommandMenu。
-   底色只压到一半，靠大半径模糊保证文字可读，下方页面以磨砂形态透出 */
+/* 磨砂面板 · thick —— Dialog、Sheet、登录卡片 */
 .lg-thick {
-  border: 1px solid transparent;
-  background:
-    var(--top-light) padding-box,
-    linear-gradient(rgb(22 24 31 / 0.62), rgb(22 24 31 / 0.62)) padding-box,
-    linear-gradient(160deg, rgb(255 255 255 / 0.15), rgb(255 255 255 / 0.045) 36%, rgb(255 255 255 / 0.025) 64%, rgb(255 255 255 / 0.07)) border-box;
+  border: 1px solid var(--separator);
+  background: rgb(255 255 255 / 0.94);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.05),
-    0 20px 56px rgb(0 0 0 / 0.42);
-  -webkit-backdrop-filter: blur(28px) saturate(150%);
-  backdrop-filter: blur(28px) saturate(150%);
+    inset 0 1px 0 rgb(255 255 255 / 1),
+    0 20px 48px rgb(24 32 43 / 0.14);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(140%);
 }
 
-/* Liquid Glass · clear —— 只用于移动端胶囊 Tab Bar、浮动圆形按钮（下方有内容经过） */
+/* 磨砂面板 · clear —— 移动端胶囊 Tab Bar */
 .lg-clear {
-  border: 1px solid transparent;
-  background:
-    var(--top-light) padding-box,
-    linear-gradient(rgb(20 21 25 / 0.3), rgb(20 21 25 / 0.3)) padding-box,
-    linear-gradient(160deg, rgb(255 255 255 / 0.4), rgb(255 255 255 / 0.08) 36%, rgb(255 255 255 / 0.05) 64%, rgb(255 255 255 / 0.2)) border-box;
+  border: 1px solid var(--separator);
+  background: rgb(255 255 255 / 0.78);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.16),
-    inset 0 -1px 0 rgb(0 0 0 / 0.16),
-    0 12px 32px rgb(0 0 0 / 0.4);
-  -webkit-backdrop-filter: blur(10px) saturate(200%) brightness(1.08);
-  backdrop-filter: blur(10px) saturate(200%) brightness(1.08);
+    inset 0 1px 0 rgb(255 255 255 / 1),
+    0 8px 24px rgb(24 32 43 / 0.12);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
 }
 
-/* 启用折射（Chromium，见 components/glass）时降低玻璃底色，让被弯折的背景透出来 */
 .lg-regular[data-refraction],
 .lg-clear[data-refraction] {
-  /* 内侧高光：左上亮边 + 右下弱亮边 + 一圈内发光，模拟玻璃厚度 */
   box-shadow:
-    inset 1px 1px 0 rgb(255 255 255 / 0.13),
-    inset -1px -1px 0 rgb(255 255 255 / 0.045),
-    inset 0 0 22px rgb(255 255 255 / 0.03),
-    0 10px 30px rgb(0 0 0 / 0.26);
+    inset 1px 1px 0 rgb(255 255 255 / 1),
+    inset -1px -1px 0 rgb(220 226 232 / 0.6),
+    0 10px 28px rgb(24 32 43 / 0.1);
 }
 
 .lg-regular[data-refraction] {
-  background:
-    var(--top-light) padding-box,
-    linear-gradient(rgb(24 26 33 / 0.4), rgb(24 26 33 / 0.4)) padding-box,
-    linear-gradient(160deg, rgb(255 255 255 / 0.2), rgb(255 255 255 / 0.05) 36%, rgb(255 255 255 / 0.025) 64%, rgb(255 255 255 / 0.09)) border-box;
+  background: rgb(255 255 255 / 0.82);
 }
 
 .lg-clear[data-refraction] {
-  background:
-    var(--top-light) padding-box,
-    linear-gradient(rgb(20 21 25 / 0.12), rgb(20 21 25 / 0.12)) padding-box,
-    linear-gradient(160deg, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0.07) 36%, rgb(255 255 255 / 0.04) 64%, rgb(255 255 255 / 0.16)) border-box;
+  background: rgb(255 255 255 / 0.7);
 }
 
 /* 标题使用 Literata + 思源宋体，KPI 数字使用 JetBrains Mono */
@@ -716,15 +721,15 @@ select {
   backdrop-filter: blur(10px);
   top: 0;
   height: var(--scroll-edge-height, 72px);
-  background: linear-gradient(rgb(17 19 26 / 0.7), rgb(17 19 26 / 0));
+  background: linear-gradient(rgb(243 245 247 / 0.92), rgb(243 245 247 / 0));
   -webkit-mask-image: linear-gradient(#000 45%, transparent);
   mask-image: linear-gradient(#000 45%, transparent);
 }
 
-/* Skeleton（components/ui/skeleton.tsx）：fill-4 底，一道微光每 1.6s 扫过 */
+/* Skeleton：fill 底，一道青绿微光扫过 */
 .skeleton-shimmer {
   background-color: var(--fill-quaternary);
-  background-image: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.06) 50%, transparent 70%);
+  background-image: linear-gradient(100deg, transparent 30%, rgb(11 127 150 / 0.08) 50%, transparent 70%);
   background-size: 200% 100%;
   background-repeat: no-repeat;
   animation: skeleton-shimmer 1.6s linear infinite;
@@ -754,25 +759,21 @@ select {
   box-shadow: var(--surface-edge);
 }
 
-.mat-thin { background: rgb(255 255 255 / 0.025); }
+.mat-thin { background: rgb(255 255 255 / 0.55); }
 .mat-regular,
 .glass-panel,
-.section-soft { background: rgb(255 255 255 / 0.035); }
-.mat-thick { background: rgb(255 255 255 / 0.05); }
+.section-soft { background: rgb(255 255 255 / 0.78); }
+.mat-thick { background: var(--bg-elevated-1); }
 
 .surface-solid {
   background-color: var(--bg-elevated-1);
   border: 1px solid var(--separator);
 }
 
-/* 侧边栏选中项：上亮下暗的渐变 + 顶边高光 + 极淡描边 + 下方阴影，像一块微微凸起的玻璃片 */
+/* 侧边栏选中项：sig-wash 浅青绿底 */
 .nav-item-selected {
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.11), rgb(255 255 255 / 0.05));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.12),
-    inset 0 0 0 1px rgb(255 255 255 / 0.05),
-    0 1px 2px rgb(0 0 0 / 0.45),
-    0 6px 16px rgb(0 0 0 / 0.28);
+  background: var(--sig-wash);
+  box-shadow: inset 3px 0 0 var(--sig);
 }
 
 /* 无障碍：降低透明度时全部退化为实色 */
@@ -795,26 +796,28 @@ select {
 
 @media (prefers-contrast: more) {
   :root {
-    --separator: rgb(255 255 255 / 0.24);
-    --label-secondary: rgb(235 235 245 / 0.78);
-    --label-tertiary: rgb(235 235 245 / 0.56);
+    --separator: #b9c3ce;
+    --label-secondary: #3a4553;
+    --label-tertiary: #5f6b7a;
   }
+}
+
+/* 为深色底设计的品牌图标（*-dark.png）：浅色底上压暗为墨色轮廓 */
+img[src*="-dark."] {
+  filter: brightness(0) saturate(100%) opacity(0.78);
 }
 
 /* ---- 旧材质类（过渡期别名，映射到新材质） ---- */
 
 .glass-panel-strong {
-  border: 1px solid transparent;
+  border: 1px solid var(--separator);
   border-radius: var(--radius-lg);
-  background:
-    var(--top-light) padding-box,
-    linear-gradient(rgb(24 26 33 / 0.5), rgb(24 26 33 / 0.5)) padding-box,
-    linear-gradient(160deg, rgb(255 255 255 / 0.16), rgb(255 255 255 / 0.045) 36%, rgb(255 255 255 / 0.025) 64%, rgb(255 255 255 / 0.07)) border-box;
+  background: rgb(255 255 255 / 0.92);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.06),
-    0 8px 28px rgb(0 0 0 / 0.26);
-  -webkit-backdrop-filter: blur(24px) saturate(150%);
-  backdrop-filter: blur(24px) saturate(150%);
+    inset 0 1px 0 rgb(255 255 255 / 1),
+    0 8px 24px rgb(24 32 43 / 0.1);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
 }
 
 .glass-field {

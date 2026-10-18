@@ -1,7 +1,7 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
-/** 登录 / 注册 / 状态页的表单卡片：Liquid Glass thick、圆角 24 */
+/** 登录 / 注册 / 状态页的表单卡片：白底 + 细线边框（纸感） */
 export function AuthCard({
   title,
   description,
@@ -14,8 +14,7 @@ export function AuthCard({
   className?: string
 }) {
   return (
-    <div className={cn('lg-thick rounded-shell p-6', className)}>
-      {/* 右侧留出关闭按钮的位置 */}
+    <div className={cn('rounded-shell border border-separator bg-elevated-1 p-6 shadow-[0_14px_40px_rgba(24,32,43,0.1)]', className)}>
       <h2 className="pr-10 text-title-2 text-label">{title}</h2>
       {description ? <p className="mt-1 text-subhead text-label-2">{description}</p> : null}
       <div className="mt-5">{children}</div>

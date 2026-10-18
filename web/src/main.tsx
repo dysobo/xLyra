@@ -9,7 +9,7 @@ import App from './App'
 
 installAppViewportSize()
 installGlassRefraction()
-// 主题已固定为深色，清理旧版主题切换留下的本地存储
+// 主题固定为浅色纸感；清理旧版主题切换留下的本地存储
 try {
   window.localStorage.removeItem('xlyra-theme')
 } catch {
