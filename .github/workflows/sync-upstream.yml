@@ -1,8 +1,8 @@
 name: Sync from Upstream
 
-# 定时把 Yachiyo-5i/xLyra 的 test 合进本 fork 的 test（保留浅色主题等本地提交）。
-# 成功推送 test 后会触发 Publish Images → GHCR → 1panel Watchtower。
-# 不硬同步 main，避免冲掉本 fork 放在默认分支上的 CI 工作流。
+# Merge Yachiyo-5i/xLyra test into this fork's test (keeps local theme commits).
+# A successful push to test triggers Publish Images -> GHCR -> 1panel Watchtower.
+# Do NOT hard-reset main; that would wipe fork CI on the default branch.
 
 on:
   schedule:
@@ -71,17 +71,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           branch="sync/upstream-test-$(date -u +%Y%m%d)"
           git checkout -B "$branch" origin/test
-          # 留下冲突标记分支，便于人工处理
           git fetch upstream test
           git merge upstream/test || true
           git add -A
           git commit -m "wip: conflict merging upstream/test" || true
           git push -u origin "$branch" --force
+          existing="$(gh pr list --base test --head "$branch" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            echo "PR already open: #$existing"
+            exit 0
+          fi
           gh pr create \
             --base test \
             --head "$branch" \
-            --title "上游 sync 冲突：请手动合并 upstream/test" \
-            --body "定时同步失败，已推送冲突分支 \`$branch\`。请在 PR 中解决后合并到 \`test\`，合并后会自动发布镜像。" \
-            || true
+            --title "Upstream sync conflict: merge upstream/test manually" \
+            --body "Scheduled sync failed. Conflict branch \`$branch\` was pushed. Resolve in the PR, merge into \`test\`, then Publish Images will rebuild GHCR for Watchtower."
