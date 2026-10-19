@@ -271,6 +271,10 @@ export function formatQuotaProbeBalance(probe: SiteQuotaProbeSummary | null | un
     const remaining = formatCreditAmount(probe.remaining_min)
     return typeof probe.limit === 'number' ? `${remaining} / ${formatCreditAmount(probe.limit)}` : remaining
   }
+  if (probe.probe_type === 'grok') {
+    if (typeof probe.remaining_min !== 'number') return undefined
+    return formatProbePercent(probe.remaining_min)
+  }
   if (probe.probe_type === 'deepseek' || probe.probe_type === 'moonshot') {
     return formatAccountBalance(probe.entries)
   }
@@ -387,6 +391,10 @@ export function siteBalanceDetails(site: Site, language?: string): SiteBalanceDe
       const rows: SiteBalanceDetail[] = [{ label: 'accountBalance', value: `${formatCreditAmount(probe.remaining_min)} credits` }]
       if (typeof probe.limit === 'number') rows.push({ label: 'totalLimit', value: `${formatCreditAmount(probe.limit)} credits` })
       return rows
+    }
+    if (probeType === 'grok') {
+      if (typeof probe.remaining_min !== 'number') return []
+      return [{ label: 'accountBalance', value: formatProbePercent(Math.max(probe.remaining_min, 0)) }]
     }
     const { prefix, suffix } = quotaProbeCurrency(probe.unit)
     const amount = (value: number) => `${prefix}${formatProbeAmount(value)}${suffix}`

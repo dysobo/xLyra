@@ -256,6 +256,17 @@ describe('Moonshot balance formatting', () => {
   })
 })
 
+describe('grok billing summary', () => {
+  it('shows the remaining plan allowance as a percent', () => {
+    const site = {
+      id: 's1',
+      site_type: 'grok',
+      quota_probe: { probe_type: 'grok', status: 'ok', remaining_min: 95, limit: 100, unit: 'percent' },
+    } as unknown as Parameters<typeof formatSiteBalance>[0]
+    expect(formatSiteBalance(site)).toBe('95%')
+  })
+})
+
 describe('workbuddy quota summary', () => {
   const site = {
     id: 's1',

@@ -260,6 +260,7 @@ export function GrokAccountsDraw({
                   toggleLabel={t('grokAccounts.toggleLabel', { name })}
                   onToggle={(enabled) => updateMutation.mutate({ account, enabled })}
                   pills={account.tier ? <Badge variant="neutral">{account.tier}</Badge> : undefined}
+                  detail={account.quota_known ? <GrokQuota account={account} /> : undefined}
                   message={account.sync_message || undefined}
                   modelCountLabel={`${account.model_count ?? account.models?.length ?? 0} ${t('accountModels.available')}`}
                   onOpenModels={() => setModelsAccount(account)}
@@ -381,6 +382,34 @@ export function GrokAccountsDraw({
         }}
       />
     </>
+  )
+}
+
+const grokPercent = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 })
+
+function GrokQuota({ account }: { account: GrokAccount }) {
+  const { t } = useTranslation('sites')
+  const remaining = account.remaining_percent ?? 0
+  const ratio = Math.min(Math.max(remaining / 100, 0), 1)
+  const low = ratio < 0.1
+  const period = account.billing_period_end ? new Date(account.billing_period_end).toLocaleDateString() : ''
+  return (
+    <div className="space-y-2">
+      <div className="space-y-1">
+        <div className="flex items-baseline justify-between text-footnote">
+          <span className="text-label-2">{account.quota_product || t('grokAccounts.quota.allowance')}</span>
+          <span className={`tabular-nums font-medium ${low ? 'text-danger' : 'text-label'}`}>
+            {grokPercent.format(remaining)}% / 100%
+          </span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-fill-1">
+          <div className={`h-full rounded-full ${low ? 'bg-danger' : 'bg-success'}`} style={{ width: `${ratio * 100}%` }} />
+        </div>
+      </div>
+      {period ? (
+        <p className="text-right text-footnote text-label-2">{t('grokAccounts.quota.resetsOn', { date: period })}</p>
+      ) : null}
+    </div>
   )
 }
 

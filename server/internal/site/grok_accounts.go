@@ -38,16 +38,22 @@ type GrokAccountModel struct {
 }
 
 type GrokAccount struct {
-	CredentialID   uuid.UUID          `json:"credential_id"`
-	MaskedToken    string             `json:"masked_token"`
-	Enabled        bool               `json:"enabled"`
-	Tier           string             `json:"tier,omitempty"`
-	SyncStatus     string             `json:"sync_status,omitempty"`
-	SyncMessage    string             `json:"sync_message,omitempty"`
-	RemainingQuota int64              `json:"remaining_quota"`
-	UsedQuota      int64              `json:"used_quota"`
-	ModelCount     int                `json:"model_count"`
-	Models         []GrokAccountModel `json:"models"`
+	CredentialID     uuid.UUID          `json:"credential_id"`
+	MaskedToken      string             `json:"masked_token"`
+	Enabled          bool               `json:"enabled"`
+	Tier             string             `json:"tier,omitempty"`
+	SyncStatus       string             `json:"sync_status,omitempty"`
+	SyncMessage      string             `json:"sync_message,omitempty"`
+	RemainingQuota   int64              `json:"remaining_quota"`
+	UsedQuota        int64              `json:"used_quota"`
+	QuotaKnown       bool               `json:"quota_known"`
+	UsedPercent      *float64           `json:"used_percent,omitempty"`
+	RemainingPercent *float64           `json:"remaining_percent,omitempty"`
+	PeriodType       string             `json:"period_type,omitempty"`
+	PeriodEnd        string             `json:"billing_period_end,omitempty"`
+	QuotaProduct     string             `json:"quota_product,omitempty"`
+	ModelCount       int                `json:"model_count"`
+	Models           []GrokAccountModel `json:"models"`
 }
 
 func (s *Service) ListGrokAccounts(ctx context.Context, siteID uuid.UUID) ([]GrokAccount, error) {
@@ -416,6 +422,25 @@ func grokAccountFromStore(credential store.SiteCredential, state store.SiteAPIKe
 	}
 	if state.UsedQuota.Valid {
 		account.UsedQuota = state.UsedQuota.Int64
+	}
+	if len(state.Usage) > 0 {
+		var usage struct {
+			Status    string   `json:"quota_status"`
+			Unit      string   `json:"unit"`
+			Used      *float64 `json:"used"`
+			Remaining *float64 `json:"remaining"`
+			PeriodEnd string   `json:"period_end"`
+			Period    string   `json:"period_type"`
+			Product   string   `json:"product"`
+		}
+		if json.Unmarshal(state.Usage, &usage) == nil && usage.Status == "ok" && usage.Unit == "percent" {
+			account.QuotaKnown = true
+			account.UsedPercent = usage.Used
+			account.RemainingPercent = usage.Remaining
+			account.PeriodEnd = usage.PeriodEnd
+			account.PeriodType = usage.Period
+			account.QuotaProduct = usage.Product
+		}
 	}
 	return account, true
 }

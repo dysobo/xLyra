@@ -127,6 +127,9 @@ func (s *Service) RefreshState(ctx context.Context, siteID uuid.UUID) (RefreshRe
 			// WorkBuddy has no site-level probe; its quota is the sum of its accounts.
 			probed = s.syncWorkBuddyQuotaSummary(ctx, fresh.ID, probed)
 		}
+		if strings.EqualFold(strings.TrimSpace(fresh.SiteType), "grok") {
+			probed = s.syncGrokQuotaSummary(ctx, fresh.ID, probed)
+		}
 		if refreshErr == nil {
 			result.Site = probed
 		}

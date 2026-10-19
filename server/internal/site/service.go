@@ -1265,7 +1265,7 @@ func (s *Service) syncModelsLocked(ctx context.Context, siteID uuid.UUID) (SyncR
 				SyncMessage:      err.Error(),
 				LastSyncedAt:     now,
 			}
-			if isWorkBuddy {
+			if isWorkBuddy || isGrok {
 				// A failed refresh must not wipe the last known quota.
 				keepWorkBuddyStateQuota(&failureParams, grokAccountState(ctx, s.db.DB(), apiKey.Credential.ID))
 			}
@@ -1297,7 +1297,7 @@ func (s *Service) syncModelsLocked(ctx context.Context, siteID uuid.UUID) (SyncR
 			SyncStatus:       "synced",
 			LastSyncedAt:     now,
 		}
-		if isWorkBuddy && accountSummary != nil {
+		if (isWorkBuddy || isGrok) && accountSummary != nil {
 			applyWorkBuddySummaryToState(&syncedParams, *accountSummary, apiKey.MaskedSecret)
 		}
 		if _, stateErr := apiKeyStateRepo.Upsert(ctx, syncedParams); stateErr != nil {
