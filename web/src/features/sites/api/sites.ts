@@ -34,7 +34,9 @@ export type Site = {
   meta: Record<string, unknown>
   model_count?: number
   api_key_count?: number
-  grok_account_count?: number
+  // Account-login sites (Grok, WorkBuddy): stored accounts and how many of them are usable.
+  account_count?: number
+  valid_account_count?: number
   validation?: SiteValidationResult
   sync_state?: SiteSyncState
   auth_config?: SiteAuthConfig
@@ -459,6 +461,8 @@ export type WorkBuddyAccount = {
   credential_id: string
   masked_token: string
   enabled: boolean
+  /** The WorkBuddy site the account is logged in to; ids come from GET workbuddy/regions. */
+  region: string
   sync_status?: string | null
   sync_message?: string | null
   model_count?: number
@@ -1218,6 +1222,7 @@ export async function refreshWorkBuddyAccounts(siteId: string) {
 
 /** WorkBuddy uses a browser login: open `auth_url`, then poll with `state`. */
 export type WorkBuddyLoginStart = {
+  region: string
   state: string
   auth_url: string
   interval: number
@@ -1228,11 +1233,54 @@ export type WorkBuddyLoginPollResult =
   | { status: 'pending' }
   | { status: 'complete'; account: WorkBuddyAccount }
 
-export async function startWorkBuddyLogin(siteId: string) {
+export async function startWorkBuddyLogin(siteId: string, region?: string) {
   return apiFetch<{ login: WorkBuddyLoginStart }>(
     `/api/v1/sites/${siteId}/workbuddy/login/start`,
     {
       method: 'POST',
+      body: region ? { region } : {},
+    },
+  )
+}
+
+/** A WorkBuddy site (China / international) an account can be logged in to. */
+export type WorkBuddyRegion = {
+  id: string
+  label: string
+  label_en: string
+}
+
+export type WorkBuddyRegionsResponse = {
+  items: WorkBuddyRegion[]
+  meta?: { count?: number; default?: string }
+}
+
+export async function listWorkBuddyRegions(siteId: string) {
+  return apiFetch<WorkBuddyRegionsResponse>(`/api/v1/sites/${siteId}/workbuddy/regions`)
+}
+
+export type WorkBuddyImportItem = {
+  source: string
+  label?: string
+  region?: string
+  status: 'imported' | 'failed'
+  error?: string
+  warning?: string
+  credential_id?: string
+}
+
+export type WorkBuddyImportResponse = {
+  items: WorkBuddyImportItem[]
+  meta: { total: number; imported: number; failed: number }
+}
+
+/** Uploads the text of WorkBuddy account export files (JSON). */
+export async function importWorkBuddyAccounts(siteId: string, files: { name: string; content: string }[]) {
+  return apiFetch<WorkBuddyImportResponse>(
+    `/api/v1/sites/${siteId}/workbuddy/accounts/import`,
+    {
+      method: 'POST',
+      body: { files },
     },
   )
 }

@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 
@@ -13,6 +15,15 @@ import (
 
 type siteWorkBuddyAccountUpdateRequest struct {
 	Enabled *bool `json:"enabled"`
+}
+
+type workBuddyLoginStartRequest struct {
+	// Region selects the WorkBuddy site to log in to; empty means the default.
+	Region string `json:"region"`
+}
+
+type workBuddyImportRequest struct {
+	Files []sitepkg.WorkBuddyImportDocument `json:"files"`
 }
 
 type workBuddyLoginPollRequest struct {
@@ -205,12 +216,19 @@ func (h Handler) StartWorkBuddyLogin(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	login, err := h.oauth.StartWorkBuddyLogin(r.Context(), siteID)
+	var payload workBuddyLoginStartRequest
+	// The body is optional: clients that send none log in to the default site.
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil && !errors.Is(err, io.EOF) {
+		h.writeError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		return
+	}
+	login, err := h.oauth.StartWorkBuddyLogin(r.Context(), siteID, payload.Region)
 	if err != nil {
 		h.writeError(w, r, http.StatusBadGateway, "workbuddy_login_start_failed", err.Error())
 		return
 	}
 	h.writeResource(w, http.StatusOK, "login", map[string]any{
+		"region":     login.Region,
 		"state":      login.State,
 		"auth_url":   login.AuthURL,
 		"interval":   login.Interval,
@@ -254,4 +272,53 @@ func (h Handler) PollWorkBuddyLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	h.invalidateGatewayModelsCache()
 	h.writeResource(w, http.StatusOK, "login", map[string]any{"status": "complete", "account": account})
+}
+
+// ListWorkBuddyRegions returns the WorkBuddy sites (China / international) an
+// account can be logged in to, as configured in protocol_specs.json.
+func (h Handler) ListWorkBuddyRegions(w http.ResponseWriter, r *http.Request) {
+	regions := sitepkg.WorkBuddyRegions()
+	items := make([]map[string]any, 0, len(regions))
+	for _, region := range regions {
+		items = append(items, map[string]any{
+			"id":       region.ID,
+			"label":    region.Label,
+			"label_en": region.LabelEN,
+		})
+	}
+	h.writeItems(w, http.StatusOK, items, map[string]any{
+		"count":   len(items),
+		"default": sitepkg.WorkBuddyDefaultRegionID(),
+	})
+}
+
+// ImportWorkBuddyAccounts stores the accounts of uploaded export files.
+func (h Handler) ImportWorkBuddyAccounts(w http.ResponseWriter, r *http.Request) {
+	if h.sites == nil {
+		h.writeError(w, r, http.StatusServiceUnavailable, "site_service_unavailable", "site service is not available")
+		return
+	}
+	siteID, ok := siteIDParam(w, r)
+	if !ok {
+		return
+	}
+	var payload workBuddyImportRequest
+	if !h.decodeJSON(w, r, &payload) {
+		return
+	}
+	items, err := h.sites.ImportWorkBuddyAccounts(r.Context(), siteID, payload.Files)
+	if err != nil {
+		h.writeError(w, r, http.StatusBadRequest, "workbuddy_import_failed", err.Error())
+		return
+	}
+	imported, failed := 0, 0
+	for _, item := range items {
+		if item.Status == "imported" {
+			imported++
+		} else {
+			failed++
+		}
+	}
+	h.invalidateGatewayModelsCache()
+	h.writeItems(w, http.StatusOK, items, map[string]any{"total": len(items), "imported": imported, "failed": failed})
 }

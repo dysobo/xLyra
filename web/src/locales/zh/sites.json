@@ -94,7 +94,7 @@
     "resources": {
       "models": "{{count}} 个模型",
       "keys": "{{enabled}}/{{total}} 个 Key",
-      "accounts": "{{count}} 个账号"
+      "accounts": "{{valid}}/{{total}} 个账号"
     },
     "updatedAtMode": {
       "showAbsolute": "切换为绝对时间",
@@ -368,6 +368,7 @@
   "workbuddyAccounts": {
     "title": "WorkBuddy 账号",
     "add": "添加账号",
+    "import": "导入账号",
     "loading": "正在加载账号",
     "empty": "暂无 WorkBuddy 账号",
     "unnamed": "WorkBuddy 账号",
@@ -417,6 +418,35 @@
       "stale": "使用上次同步模型",
       "partial": "部分",
       "unknown": "未同步"
+    },
+    "region": {
+      "cn": "国内站",
+      "intl": "国际站"
+    },
+    "regionDialog": {
+      "title": "选择登录站点",
+      "description": "请选择账号所在的 WorkBuddy 站点，之后会跳转到对应站点完成登录。",
+      "cn": "国内站",
+      "cnHint": "适用于国内账号，使用腾讯云国内站登录",
+      "intl": "国际站",
+      "intlHint": "适用于海外账号，使用 CodeBuddy 国际站登录",
+      "continue": "继续登录"
+    },
+    "importDialog": {
+      "title": "导入 WorkBuddy 账号",
+      "dropzone": "拖拽 JSON 文件到此处，或点击选择",
+      "hint": "支持导出的 WorkBuddy 账号 JSON；国内站、国际站由文件中的 realm 与 domain 自动识别",
+      "selectedCount": "已选择 {{count}} 个文件",
+      "import": "导入",
+      "importWithCount": "导入 {{count}} 个文件",
+      "cancel": "取消",
+      "done": "完成",
+      "summary": "共 {{total}} 个账号，成功 {{imported}} 个，失败 {{failed}} 个",
+      "imported": "已导入",
+      "failed": "失败",
+      "unnamed": "未命名账号",
+      "toastDone": "账号导入完成",
+      "toastFailed": "账号导入失败"
     }
   },
   "test": {

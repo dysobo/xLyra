@@ -94,7 +94,7 @@
     "resources": {
       "models": "{{count}} Models",
       "keys": "{{enabled}}/{{total}} Keys",
-      "accounts": "{{count}} Accounts"
+      "accounts": "{{valid}}/{{total}} Accounts"
     },
     "updatedAtMode": {
       "showAbsolute": "Switch to absolute time",
@@ -366,6 +366,7 @@
   "workbuddyAccounts": {
     "title": "WorkBuddy Accounts",
     "add": "Add account",
+    "import": "Import accounts",
     "loading": "Loading accounts",
     "empty": "No WorkBuddy accounts",
     "unnamed": "WorkBuddy account",
@@ -415,6 +416,35 @@
       "stale": "Using last synced models",
       "partial": "Partial",
       "unknown": "Not synced"
+    },
+    "region": {
+      "cn": "China site",
+      "intl": "International site"
+    },
+    "regionDialog": {
+      "title": "Choose a login site",
+      "description": "Pick the WorkBuddy site your account belongs to. You will be sent to that site to log in.",
+      "cn": "China site",
+      "cnHint": "For mainland accounts, logs in on the Tencent Cloud China site",
+      "intl": "International site",
+      "intlHint": "For overseas accounts, logs in on the CodeBuddy international site",
+      "continue": "Continue to login"
+    },
+    "importDialog": {
+      "title": "Import WorkBuddy accounts",
+      "dropzone": "Drop JSON files here, or click to choose",
+      "hint": "Exported WorkBuddy account JSON. The China or international site is detected from realm and domain in the file",
+      "selectedCount": "{{count}} files selected",
+      "import": "Import",
+      "importWithCount": "Import {{count}} files",
+      "cancel": "Cancel",
+      "done": "Done",
+      "summary": "{{total}} accounts: {{imported}} imported, {{failed}} failed",
+      "imported": "Imported",
+      "failed": "Failed",
+      "unnamed": "Unnamed account",
+      "toastDone": "Account import finished",
+      "toastFailed": "Account import failed"
     }
   },
   "test": {

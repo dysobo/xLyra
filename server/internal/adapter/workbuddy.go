@@ -14,28 +14,41 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"xlyra/server/internal/protocolspec"
 )
 
-// WorkBuddy (Tencent CodeBuddy CN, copilot.tencent.com) site adapter.
+// WorkBuddy (Tencent CodeBuddy: China and international sites) site adapter.
 //
 // Accounts are connected through the CodeBuddy CLI browser login (see
 // oauth/workbuddy.go); this adapter only describes the upstream: default base
 // URL, model catalog, and the request headers the gateway has to attach.
 const (
 	WorkBuddySiteType      = "workbuddy"
-	WorkBuddyBaseURL       = "https://copilot.tencent.com"
-	WorkBuddyChatPath      = "/v2/chat/completions"
-	WorkBuddyClientVersion = "2.63.2"
-	WorkBuddyUserAgent     = "CLI/" + WorkBuddyClientVersion + " CodeBuddy/" + WorkBuddyClientVersion
-	WorkBuddyOrigin        = "https://www.codebuddy.cn"
-	WorkBuddyProduct       = "SaaS"
-
-	workBuddyProductCode   = "p_tcaca"
-	workBuddyResourcePath  = "/v2/billing/meter/get-user-resource"
-	workBuddyConfigPath    = "/v3/config"
-	workBuddyAccountPath   = "/v2/plugin/login/account"
 	workBuddyResponseLimit = 4 << 20
 )
+
+// The site hosts (China / international), request paths and client identity
+// come from protocol_specs.json (providers.workbuddy); see protocolspec.
+
+func workBuddySpec() protocolspec.WorkBuddySpec {
+	return protocolspec.MustWorkBuddy()
+}
+
+// WorkBuddyDefaultBaseURL is the base URL of the default region.
+func WorkBuddyDefaultBaseURL() string {
+	return workBuddySpec().Default().BaseURL
+}
+
+// WorkBuddyRegionForURL finds the region a request URL / base URL belongs to,
+// falling back to the default region.
+func WorkBuddyRegionForURL(rawURL string) protocolspec.WorkBuddyRegion {
+	spec := workBuddySpec()
+	if region, ok := spec.RegionForURL(rawURL); ok {
+		return region
+	}
+	return spec.Default()
+}
 
 var ErrWorkBuddyUnauthorized = errors.New("workbuddy upstream unauthorized")
 
@@ -56,7 +69,7 @@ func (WorkBuddy) SiteTypes() []string {
 }
 
 func (WorkBuddy) DefaultBaseURL() string {
-	return WorkBuddyBaseURL
+	return WorkBuddyDefaultBaseURL()
 }
 
 func (WorkBuddy) Capabilities() []Capability {
@@ -137,7 +150,7 @@ type workBuddyEnvelope struct {
 func workBuddyEndpoint(site SiteConfig, path string) string {
 	base := strings.TrimRight(strings.TrimSpace(site.BaseURL), "/")
 	if base == "" {
-		base = WorkBuddyBaseURL
+		base = WorkBuddyDefaultBaseURL()
 	}
 	return base + path
 }
@@ -193,7 +206,7 @@ func (a WorkBuddy) requestJSON(ctx context.Context, site SiteConfig, token strin
 // fetchAccount calls the authenticated account endpoint; it is the cheapest
 // call that proves the token is still accepted (the model config is public).
 func (a WorkBuddy) fetchAccount(ctx context.Context, site SiteConfig, token string) (map[string]any, error) {
-	data, err := a.getJSON(ctx, site, token, workBuddyAccountPath)
+	data, err := a.getJSON(ctx, site, token, workBuddySpec().Endpoints.Account)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +223,7 @@ func (a WorkBuddy) fetchAccount(ctx context.Context, site SiteConfig, token stri
 // ones actually routable, so the catalog is restricted to those when present.
 // Image-only entries (no token limits) are skipped.
 func (a WorkBuddy) fetchModels(ctx context.Context, site SiteConfig, token string) ([]Model, error) {
-	data, err := a.getJSON(ctx, site, token, workBuddyConfigPath)
+	data, err := a.getJSON(ctx, site, token, workBuddySpec().Endpoints.Models)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +307,7 @@ func (a WorkBuddy) fetchQuota(ctx context.Context, site SiteConfig, token string
 	payload, err := json.Marshal(map[string]any{
 		"PageNumber":               1,
 		"PageSize":                 100,
-		"ProductCode":              workBuddyProductCode,
+		"ProductCode":              workBuddySpec().Client.ProductCode,
 		"Status":                   []int{0, 3},
 		"PackageEndTimeRangeBegin": now.Format("2006-01-02 15:04:05"),
 		"PackageEndTimeRangeEnd":   now.AddDate(101, 0, 0).Format("2006-01-02 15:04:05"),
@@ -302,7 +315,7 @@ func (a WorkBuddy) fetchQuota(ctx context.Context, site SiteConfig, token string
 	if err != nil {
 		return workBuddyQuota{}, err
 	}
-	data, err := a.requestJSON(ctx, site, token, http.MethodPost, workBuddyResourcePath, payload)
+	data, err := a.requestJSON(ctx, site, token, http.MethodPost, workBuddySpec().Endpoints.Billing, payload)
 	if err != nil {
 		return workBuddyQuota{}, err
 	}
@@ -400,14 +413,20 @@ func workBuddyTokenClaims(token string) map[string]any {
 }
 
 // ApplyWorkBuddyUpstreamHeaders attaches the headers the CodeBuddy gateway
-// expects. domain is the tenant domain returned at login (may be empty).
+// expects. The Origin follows the site the request is sent to (China or
+// international); domain is the tenant domain returned at login (may be empty).
 func ApplyWorkBuddyUpstreamHeaders(req *http.Request, token string, domain string) {
+	spec := workBuddySpec()
+	region := spec.Default()
+	if req.URL != nil {
+		region = WorkBuddyRegionForURL(req.URL.String())
+	}
 	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(token))
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	req.Header.Set("Origin", WorkBuddyOrigin)
-	req.Header.Set("Referer", WorkBuddyOrigin+"/")
-	req.Header.Set("User-Agent", WorkBuddyUserAgent)
-	req.Header.Set("X-Product", WorkBuddyProduct)
+	req.Header.Set("Origin", region.Origin)
+	req.Header.Set("Referer", region.Origin+"/")
+	req.Header.Set("User-Agent", spec.Client.UserAgent)
+	req.Header.Set("X-Product", spec.Client.Product)
 	if domain = strings.TrimSpace(domain); domain != "" {
 		req.Header.Set("X-Domain", domain)
 	} else {
@@ -415,6 +434,11 @@ func ApplyWorkBuddyUpstreamHeaders(req *http.Request, token string, domain strin
 	}
 }
 
+// IsWorkBuddyURL reports whether the URL points at one of the WorkBuddy sites.
 func IsWorkBuddyURL(value *url.URL) bool {
-	return value != nil && strings.EqualFold(value.Scheme, "https") && strings.EqualFold(value.Hostname(), "copilot.tencent.com")
+	if value == nil || !strings.EqualFold(value.Scheme, "https") {
+		return false
+	}
+	_, ok := workBuddySpec().RegionForURL(value.String())
+	return ok
 }

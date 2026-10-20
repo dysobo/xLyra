@@ -177,10 +177,11 @@ func (h Handler) TestSiteModel(ctx context.Context, input SiteModelTestInput) (S
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return SiteModelTestResult{}, fmt.Errorf("read site model endpoint override: %w", err)
 	}
-	endpointTypes := store.ResolveSiteModelEndpointPolicy(canonical, model, override).SupportedEndpointTypes
-	if len(endpointTypes) == 0 {
-		return SiteModelTestResult{}, siteModelTestError(http.StatusBadRequest, "model_test_protocol_unavailable", "model has no enabled protocols")
+	endpointPolicy, err := store.ResolveSiteModelEndpointPolicyForSite(canonical, model, override, site.SiteType, site.BaseURL)
+	if err != nil {
+		return SiteModelTestResult{}, fmt.Errorf("resolve site model endpoint policy: %w", err)
 	}
+	endpointTypes := endpointPolicy.SupportedEndpointTypes
 	candidate := routeengine.Candidate{
 		Site: routeengine.CandidateSite{
 			ID:              site.ID,
@@ -198,6 +199,9 @@ func (h Handler) TestSiteModel(ctx context.Context, input SiteModelTestInput) (S
 			MatchSource:            model.MatchSource,
 			MatchConfidence:        model.MatchConfidence,
 		},
+	}
+	if len(candidate.Model.SupportedEndpointTypes) == 0 {
+		return SiteModelTestResult{}, siteModelTestError(http.StatusBadRequest, "model_test_protocol_unavailable", "model has no enabled protocols")
 	}
 
 	var selectedCredential *store.GatewayCredential
@@ -320,7 +324,7 @@ func (h Handler) forwardSiteModelTestRequest(
 	result.pricingGroup = selectedPricing.GroupName
 	result.pricing = selectedPricing
 
-	payload, err := protocol.BuildUpstreamPayload(request, candidate)
+	payload, err := buildGatewayUpstreamPayload(protocol, request, candidate)
 	if err != nil {
 		result.statusCode = http.StatusBadRequest
 		result.errorType = "request_encode_failed"
@@ -335,9 +339,10 @@ func (h Handler) forwardSiteModelTestRequest(
 		upstreamStream = true
 	}
 	upstreamProfileRequest := upstreamClientProfileRequest{
-		Stream:          upstreamStream,
-		ImageGeneration: isCodexImageGenerationRequest(candidate, request, payload) || (isGrokSite(candidate.Site.SiteType) && request.DownstreamPath == gatewayEndpointImagesGenerations),
-		ClaudeCode:      isClaudeCodeSite(candidate.Site.SiteType),
+		Stream:             upstreamStream,
+		ImageGeneration:    isCodexImageGenerationRequest(candidate, request, payload) || (isGrokSite(candidate.Site.SiteType) && request.DownstreamPath == gatewayEndpointImagesGenerations),
+		ClaudeCode:         isClaudeCodeSite(candidate.Site.SiteType),
+		DisableCompression: isOpenCodeZenSite(candidate),
 	}
 	upstreamClient, siteConfig, requestHeaders, err := h.upstreamClientForSite(ctx, candidate.Site.ID, upstreamProfileRequest)
 	if err != nil {
@@ -359,7 +364,14 @@ func (h Handler) forwardSiteModelTestRequest(
 		return result
 	}
 
-	endpoint := protocol.UpstreamPath(candidate.Site.BaseURL)
+	upstreamBaseURL := candidate.Site.BaseURL
+	if isWorkBuddySite(candidate.Site.SiteType) && selectedCredential != nil && h.oauth != nil {
+		// WorkBuddy accounts live on the China or the international site.
+		if access, accessErr := h.oauth.EnsureWorkBuddyAccess(ctx, selectedCredential.Credential.ID); accessErr == nil {
+			upstreamBaseURL = access.Region.BaseURL
+		}
+	}
+	endpoint := protocol.UpstreamPath(upstreamBaseURL)
 	result.upstreamPath = endpointPath(endpoint)
 	result.upstreamURL = endpoint
 	req, err := newUpstreamHTTPRequest(ctx, protocol, endpoint, body)
@@ -399,6 +411,9 @@ func (h Handler) forwardSiteModelTestRequest(
 	}
 	if isClaudeCodeSite(candidate.Site.SiteType) {
 		applyClaudeCodeOAuthGatewayHeaders(req, upstreamKey)
+	}
+	if isOpenCodeZenSite(candidate) {
+		applyOpenCodeGoGatewayHeaders(req, request, upstreamKey)
 	}
 	if err := signUpstreamRequest(req, protocol, body, upstreamKey); err != nil {
 		result.statusCode = http.StatusBadGateway
@@ -474,12 +489,12 @@ func (h Handler) siteModelTestCredential(ctx context.Context, candidate routeeng
 		if h.oauth == nil {
 			return "", "", "", uuid.Nil, "", "workbuddy_oauth_unavailable", fmt.Errorf("oauth service is not available")
 		}
-		accessToken, domain, err := h.oauth.EnsureWorkBuddyAccessToken(ctx, credential.Credential.ID)
+		access, err := h.oauth.EnsureWorkBuddyAccess(ctx, credential.Credential.ID)
 		if err != nil {
 			return "", "", "", credential.Credential.ID, "", "workbuddy_oauth_refresh_failed", err
 		}
 		// The second value is the per-account header argument; for WorkBuddy it is the tenant domain.
-		return accessToken, domain, credential.Credential.MaskedSecret, credential.Credential.ID, credential.GroupName.String, "", nil
+		return access.Token, access.Domain, credential.Credential.MaskedSecret, credential.Credential.ID, credential.GroupName.String, "", nil
 	}
 	upstreamKey, err := h.credentials.Decrypt(credential.Credential.EncryptedSecret)
 	if err != nil {

@@ -18,6 +18,7 @@ import {
   formatRelativeDateTime,
   formatRoutingPriority,
   isAccountLoginSiteType,
+  siteAccountCounts,
   isOAuthSite,
   isSiteEnableBlockedByAbnormalState,
   siteAccountEmail,
@@ -155,7 +156,7 @@ export function SitesTable({
               <>
                 <span className="text-label-2">/</span>
                 <button type="button" className="hover:text-label text-label cursor-pointer" onClick={() => onOpenGrokAccounts(site)}>
-                  {t('table.resources.accounts', { count: site.grok_account_count ?? site.api_key_count ?? 0 })}
+                  {t('table.resources.accounts', siteAccountCounts(site))}
                 </button>
               </>
             ) : keyInfo ? (

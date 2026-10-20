@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 )
 
@@ -99,5 +100,55 @@ func TestWorkBuddyRejectedTokenIsUnauthorized(t *testing.T) {
 	err := NewWorkBuddy().ValidateCredentials(context.Background(), site, "bad")
 	if !errors.Is(err, ErrWorkBuddyUnauthorized) || !IsWorkBuddyUnauthorizedError(err) {
 		t.Fatalf("expected unauthorized error, got %v", err)
+	}
+}
+
+func TestWorkBuddyHeadersFollowTheSiteOfTheRequest(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		url        string
+		wantOrigin string
+	}{
+		{url: "https://copilot.tencent.com/v2/chat/completions", wantOrigin: "https://www.codebuddy.cn"},
+		{url: "https://www.codebuddy.ai/v2/chat/completions", wantOrigin: "https://www.codebuddy.ai"},
+		{url: "https://unknown.example/v2/chat/completions", wantOrigin: "https://www.codebuddy.cn"},
+	}
+	for _, tt := range tests {
+		req, err := http.NewRequest(http.MethodPost, tt.url, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ApplyWorkBuddyUpstreamHeaders(req, "token", "")
+		if got := req.Header.Get("Origin"); got != tt.wantOrigin {
+			t.Fatalf("%s: Origin = %q, want %q", tt.url, got, tt.wantOrigin)
+		}
+		if got := req.Header.Get("Referer"); got != tt.wantOrigin+"/" {
+			t.Fatalf("%s: Referer = %q", tt.url, got)
+		}
+		if req.Header.Get("User-Agent") == "" || req.Header.Get("X-Product") == "" {
+			t.Fatalf("%s: client identity headers are missing", tt.url)
+		}
+	}
+}
+
+func TestWorkBuddyBaseURLsComeFromTheSpec(t *testing.T) {
+	t.Parallel()
+
+	if got := (WorkBuddy{}).DefaultBaseURL(); got != "https://copilot.tencent.com" {
+		t.Fatalf("default base url = %q", got)
+	}
+	if region := WorkBuddyRegionForURL("https://www.codebuddy.ai"); region.ID != "intl" {
+		t.Fatalf("region = %q, want intl", region.ID)
+	}
+	for _, raw := range []string{"https://copilot.tencent.com/x", "https://www.codebuddy.ai"} {
+		parsed, _ := url.Parse(raw)
+		if !IsWorkBuddyURL(parsed) {
+			t.Fatalf("%s should be a WorkBuddy URL", raw)
+		}
+	}
+	other, _ := url.Parse("https://example.com")
+	if IsWorkBuddyURL(other) {
+		t.Fatal("example.com is not a WorkBuddy URL")
 	}
 }

@@ -496,7 +496,7 @@ func (s *Service) Create(ctx context.Context, params CreateSiteParams) (store.Si
 		params.BaseURL = adapter.GrokChatBaseURL
 	}
 	if params.SiteType == adapter.WorkBuddySiteType {
-		params.BaseURL = adapter.WorkBuddyBaseURL
+		params.BaseURL = adapter.WorkBuddyDefaultBaseURL()
 	}
 
 	if params.BaseURL == "" {
@@ -610,7 +610,7 @@ func (s *Service) Update(ctx context.Context, params UpdateSiteParams) (store.Si
 		params.BaseURL = adapter.GrokChatBaseURL
 	}
 	if params.SiteType == adapter.WorkBuddySiteType {
-		params.BaseURL = adapter.WorkBuddyBaseURL
+		params.BaseURL = adapter.WorkBuddyDefaultBaseURL()
 	}
 
 	if params.ID == uuid.Nil {
@@ -1206,24 +1206,28 @@ func (s *Service) syncModelsLocked(ctx context.Context, siteID uuid.UUID) (SyncR
 		}
 		enabledKeyCount++
 		secret := apiKey.Secret
+		keySite := s.toAdapterSite(ctx, site)
 		var err error
 		if isGrok {
 			secret, err = s.oauth.EnsureGrokAccessToken(ctx, apiKey.Credential.ID)
 		} else if isWorkBuddy {
-			secret, _, err = s.oauth.EnsureWorkBuddyAccessToken(ctx, apiKey.Credential.ID)
+			var access oauthsvc.WorkBuddyAccess
+			access, err = s.oauth.EnsureWorkBuddyAccess(ctx, apiKey.Credential.ID)
+			secret = access.Token
+			keySite = workBuddySiteConfig(keySite, access)
 		}
 		var models []adapter.Model
 		var accountSummary *adapter.APIKeySummary
 		if err == nil {
 			if usesAccountSummary {
 				var summary adapter.APIKeySummary
-				summary, err = summaryFetcher.SummarizeAPIKey(ctx, s.toAdapterSite(ctx, site), secret)
+				summary, err = summaryFetcher.SummarizeAPIKey(ctx, keySite, secret)
 				models = summary.Models
 				if err == nil {
 					accountSummary = &summary
 				}
 			} else {
-				models, err = modelLister.ListModels(ctx, s.toAdapterSite(ctx, site), secret)
+				models, err = modelLister.ListModels(ctx, keySite, secret)
 			}
 		}
 		if err != nil {

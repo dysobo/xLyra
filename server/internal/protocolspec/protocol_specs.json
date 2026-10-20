@@ -640,7 +640,8 @@
       "path": "/v2/chat/completions",
       "documentation": [
         "https://cloud.tencent.com/document/product/1831/137057",
-        "https://cnb.cool/codebuddy/openapp_example"
+        "https://cnb.cool/codebuddy/openapp_example",
+        "https://www.codebuddy.ai/docs/cli/quickstart"
       ],
       "request_params": {
         "forced": {
@@ -650,6 +651,43 @@
           "reasoning_effort": "medium",
           "reasoning_summary": "auto"
         }
+      },
+      "workbuddy": {
+        "default_region": "cn",
+        "client": {
+          "version": "2.63.2",
+          "user_agent": "CLI/{version} CodeBuddy/{version}",
+          "product": "SaaS",
+          "product_code": "p_tcaca"
+        },
+        "endpoints": {
+          "auth_state": "/v2/plugin/auth/state?platform=CLI",
+          "auth_token": "/v2/plugin/auth/token",
+          "token_refresh": "/v2/plugin/auth/token/refresh",
+          "account": "/v2/plugin/login/account",
+          "models": "/v3/config",
+          "billing": "/v2/billing/meter/get-user-resource"
+        },
+        "regions": [
+          {
+            "id": "cn",
+            "label": "国内站",
+            "label_en": "China site",
+            "base_url": "https://copilot.tencent.com",
+            "origin": "https://www.codebuddy.cn",
+            "domains": ["www.codebuddy.cn"],
+            "realms": ["cn", "china", "domestic"]
+          },
+          {
+            "id": "intl",
+            "label": "国际站",
+            "label_en": "International site",
+            "base_url": "https://www.codebuddy.ai",
+            "origin": "https://www.codebuddy.ai",
+            "domains": ["www.codebuddy.ai"],
+            "realms": ["intl", "international", "global", "overseas"]
+          }
+        ]
       }
     },
     "opencode_go": {
@@ -679,6 +717,18 @@
       "model_endpoint_types": [
         {
           "models": [
+            "longcat-2.5-preview-free",
+            "mimo-v2.6-flash-free",
+            "minimax-m3.1-flash-free",
+            "nemotron-3.5-lightning-free",
+            "nemotron-3.5-super-vl-free"
+          ],
+          "supported_endpoint_types": [
+            "openai"
+          ]
+        },
+        {
+          "models": [
             "gpt-5.6-luna"
           ],
           "supported_endpoint_types": [
@@ -692,6 +742,14 @@
           ],
           "supported_endpoint_types": [
             "anthropic-messages"
+          ]
+        },
+        {
+          "prefixes": [
+            "jev-"
+          ],
+          "supported_endpoint_types": [
+            "typesafe-systemone"
           ]
         },
         {

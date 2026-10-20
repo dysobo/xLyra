@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { LoaderCircle, RefreshCw, Settings2 } from 'lucide-react'
+import { LoaderCircle, RotateCcw, Settings2, Upload } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ModelsDraw, type ModelsDrawItem } from '@/components/common/models-draw'
 import { Button } from '@/components/ui/button'
@@ -103,11 +103,17 @@ export function AccountsListDialog({
   )
 }
 
-/** Header actions: the primary "add" button, plus a quiet refresh-all icon. */
+/**
+ * Header actions: the primary "add" button, an optional "import" button on its
+ * left, plus a quiet refresh-all icon.
+ */
 export function AccountHeaderActions({
   addLabel,
   addDisabled,
   onAdd,
+  importLabel,
+  importDisabled,
+  onImport,
   refreshAllLabel,
   refreshingAll,
   onRefreshAll,
@@ -115,6 +121,9 @@ export function AccountHeaderActions({
   addLabel: string
   addDisabled?: boolean
   onAdd: () => void
+  importLabel?: string
+  importDisabled?: boolean
+  onImport?: () => void
   refreshAllLabel: string
   refreshingAll?: boolean
   onRefreshAll: () => void
@@ -130,8 +139,14 @@ export function AccountHeaderActions({
         disabled={refreshingAll}
         onClick={onRefreshAll}
       >
-        {refreshingAll ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+        {refreshingAll ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
       </Button>
+      {onImport && importLabel ? (
+        <Button size="sm" variant="secondary" disabled={importDisabled} onClick={onImport}>
+          <Upload className="h-3.5 w-3.5" />
+          {importLabel}
+        </Button>
+      ) : null}
       <Button size="sm" disabled={addDisabled} onClick={onAdd}>
         {addLabel}
       </Button>

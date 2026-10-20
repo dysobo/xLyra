@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Site, SiteQuotaProbeEntry } from '@/features/sites/api/sites'
-import { accountBalanceDetails, formatAccountBalance, formatCompactTokens, formatDateTime, formatSiteBalance, isSiteAbnormal, normalizedSiteTypeFilter, siteBalanceDetails, sortSitesForDisplay, sub2APIKeyQuotaDetails } from '@/features/sites/lib/site-utils'
+import { accountBalanceDetails, formatAccountBalance, formatCompactTokens, formatDateTime, formatSiteBalance, isSiteAbnormal, normalizedSiteTypeFilter, siteAccountCounts, siteBalanceDetails, sortSitesForDisplay, sub2APIKeyQuotaDetails } from '@/features/sites/lib/site-utils'
 
 function siteWithSyncState(failureClass: 'unknown' | 'limited' | 'transient' | 'credential_invalid'): Site {
   return {
@@ -283,5 +283,21 @@ describe('workbuddy quota summary', () => {
       { label: 'accountBalance', value: '1,999 credits' },
       { label: 'totalLimit', value: '2,000 credits' },
     ])
+  })
+})
+
+describe('siteAccountCounts', () => {
+  it('shows valid accounts out of the stored total even when site state counts reset to zero', () => {
+    expect(siteAccountCounts({ account_count: 1, valid_account_count: 0, api_key_count: 0 })).toEqual({ valid: 0, total: 1 })
+    expect(siteAccountCounts({ account_count: 3, valid_account_count: 2 })).toEqual({ valid: 2, total: 3 })
+  })
+
+  it('falls back to the cached count and treats those accounts as valid', () => {
+    expect(siteAccountCounts({ api_key_count: 2 })).toEqual({ valid: 2, total: 2 })
+    expect(siteAccountCounts({})).toEqual({ valid: 0, total: 0 })
+  })
+
+  it('never reports more valid accounts than total', () => {
+    expect(siteAccountCounts({ account_count: 1, valid_account_count: 5 })).toEqual({ valid: 1, total: 1 })
   })
 })

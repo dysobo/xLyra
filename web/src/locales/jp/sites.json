@@ -94,7 +94,7 @@
     "resources": {
       "models": "{{count}} 個のモデル",
       "keys": "{{enabled}}/{{total}} 個のキー",
-      "accounts": "{{count}} アカウント"
+      "accounts": "{{valid}}/{{total}} アカウント"
     },
     "updatedAtMode": {
       "showAbsolute": "絶対時刻に切り替え",
@@ -357,6 +357,7 @@
   "workbuddyAccounts": {
     "title": "WorkBuddy アカウント",
     "add": "アカウントを追加",
+    "import": "アカウントをインポート",
     "loading": "アカウントを読み込み中",
     "empty": "WorkBuddy アカウントはありません",
     "unnamed": "WorkBuddy アカウント",
@@ -406,6 +407,35 @@
       "stale": "前回同期したモデルを使用",
       "partial": "一部",
       "unknown": "未同期"
+    },
+    "region": {
+      "cn": "中国サイト",
+      "intl": "国際サイト"
+    },
+    "regionDialog": {
+      "title": "ログイン先サイトを選択",
+      "description": "アカウントが属する WorkBuddy サイトを選択してください。該当サイトでログインします。",
+      "cn": "中国サイト",
+      "cnHint": "中国本土のアカウント向け。Tencent Cloud 中国サイトでログインします",
+      "intl": "国際サイト",
+      "intlHint": "海外アカウント向け。CodeBuddy 国際サイトでログインします",
+      "continue": "ログインへ進む"
+    },
+    "importDialog": {
+      "title": "WorkBuddy アカウントをインポート",
+      "dropzone": "JSON ファイルをここにドロップ、またはクリックして選択",
+      "hint": "エクスポートした WorkBuddy アカウント JSON。中国／国際サイトはファイル内の realm と domain から判定します",
+      "selectedCount": "{{count}} 件のファイルを選択",
+      "import": "インポート",
+      "importWithCount": "{{count}} 件をインポート",
+      "cancel": "キャンセル",
+      "done": "完了",
+      "summary": "{{total}} 件中 {{imported}} 件成功、{{failed}} 件失敗",
+      "imported": "インポート済み",
+      "failed": "失敗",
+      "unnamed": "名称未設定のアカウント",
+      "toastDone": "アカウントのインポートが完了しました",
+      "toastFailed": "アカウントのインポートに失敗しました"
     }
   },
   "test": {

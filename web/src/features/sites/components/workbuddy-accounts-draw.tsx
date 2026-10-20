@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ExternalLink, KeyRound, LoaderCircle, RefreshCw, Trash2 } from 'lucide-react'
+import { ExternalLink, KeyRound, LoaderCircle, RotateCcw, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,10 +13,13 @@ import {
   AccountsListDialog,
 } from '@/features/sites/components/account-dialogs'
 import { useNestedDialogClassNames } from '@/features/sites/components/use-nested-dialog'
+import { WorkBuddyImportDialog } from '@/features/sites/components/workbuddy-import-dialog'
+import { cn } from '@/lib/utils'
 import { toast } from '@/lib/toast'
 import {
   deleteWorkBuddyAccount,
   listWorkBuddyAccounts,
+  listWorkBuddyRegions,
   pollWorkBuddyLogin,
   refreshWorkBuddyAccount,
   refreshWorkBuddyAccounts,
@@ -28,9 +31,12 @@ import {
   type Site,
   type WorkBuddyAccount,
   type WorkBuddyLoginStart,
+  type WorkBuddyRegion,
+  type WorkBuddyRegionsResponse,
 } from '@/features/sites/api/sites'
 
 const EMPTY_ACCOUNTS: WorkBuddyAccount[] = []
+const EMPTY_REGIONS: WorkBuddyRegion[] = []
 
 type LoginState = {
   status: 'starting' | 'waiting' | 'error'
@@ -52,14 +58,18 @@ export function WorkBuddyAccountsDraw({
   site: Site | null
   onOpenChange: (open: boolean) => void
 }) {
-  const { t } = useTranslation('sites')
+  const { t, i18n } = useTranslation('sites')
   const queryClient = useQueryClient()
   const [deleting, setDeleting] = useState<WorkBuddyAccount | null>(null)
   const [login, setLogin] = useState<LoginState | null>(null)
   const [modelsAccount, setModelsAccount] = useState<WorkBuddyAccount | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  // Choosing the site (China / international) to log in to, before the login starts.
+  const [regionPickOpen, setRegionPickOpen] = useState(false)
+  const [pickedRegion, setPickedRegion] = useState('')
   const open = Boolean(site)
   const nestedZ = useNestedDialogClassNames()
-  const nestedOpen = Boolean(login) || Boolean(deleting) || Boolean(modelsAccount)
+  const nestedOpen = Boolean(login) || Boolean(deleting) || Boolean(modelsAccount) || importOpen || regionPickOpen
   const queryKey = site
     ? [...sitesQueryKeys.detail(site.id), 'workbuddy-accounts']
     : [...sitesQueryKeys.all, 'workbuddy-accounts', 'none']
@@ -69,6 +79,21 @@ export function WorkBuddyAccountsDraw({
     queryFn: () => site ? listWorkBuddyAccounts(site.id) : Promise.resolve({ items: EMPTY_ACCOUNTS }),
     enabled: open,
   })
+
+  const regionsQuery = useQuery({
+    queryKey: [...queryKey, 'regions'],
+    queryFn: (): Promise<WorkBuddyRegionsResponse> => site ? listWorkBuddyRegions(site.id) : Promise.resolve({ items: [] as WorkBuddyRegion[] }),
+    enabled: open,
+    staleTime: Infinity,
+  })
+  const regions = regionsQuery.data?.items ?? EMPTY_REGIONS
+  const defaultRegion = regionsQuery.data?.meta?.default ?? regions[0]?.id ?? ''
+
+  function regionLabel(id: string) {
+    const region = regions.find((item) => item.id === id)
+    const fallback = region ? (i18n.language.startsWith('en') ? region.label_en : region.label) : id
+    return t(`workbuddyAccounts.region.${id}`, { defaultValue: fallback })
+  }
 
   const updateMutation = useMutation({
     mutationFn: ({ account, enabled }: { account: WorkBuddyAccount; enabled: boolean }) => {
@@ -171,11 +196,11 @@ export function WorkBuddyAccountsDraw({
     if (site) await queryClient.invalidateQueries({ queryKey: sitesQueryKeys.models(site.id) })
   }
 
-  async function startLogin(purpose: LoginState['purpose'], credentialId?: string) {
+  async function startLogin(purpose: LoginState['purpose'], credentialId?: string, region?: string) {
     if (!site) return
     setLogin({ status: 'starting', purpose, credentialId })
     try {
-      const result = await startWorkBuddyLogin(site.id)
+      const result = await startWorkBuddyLogin(site.id, region)
       setLogin({ status: 'waiting', purpose, credentialId, info: result.login })
       window.open(result.login.auth_url, '_blank', 'noopener')
     } catch (error) {
@@ -221,7 +246,9 @@ export function WorkBuddyAccountsDraw({
         title={t('workbuddyAccounts.title')}
         nestedOpen={nestedOpen}
         onCloseInnermost={() => {
-          if (login) setLogin(null)
+          if (importOpen) setImportOpen(false)
+          else if (regionPickOpen) setRegionPickOpen(false)
+          else if (login) setLogin(null)
           else if (deleting) setDeleting(null)
           else if (modelsAccount) setModelsAccount(null)
         }}
@@ -230,6 +257,8 @@ export function WorkBuddyAccountsDraw({
             setDeleting(null)
             setLogin(null)
             setModelsAccount(null)
+            setImportOpen(false)
+            setRegionPickOpen(false)
           }
           onOpenChange(next)
         }}
@@ -237,7 +266,13 @@ export function WorkBuddyAccountsDraw({
           <AccountHeaderActions
             addLabel={t('workbuddyAccounts.add')}
             addDisabled={Boolean(login)}
-            onAdd={() => startLogin('add')}
+            onAdd={() => {
+              setPickedRegion((current) => current || defaultRegion)
+              setRegionPickOpen(true)
+            }}
+            importLabel={t('workbuddyAccounts.import')}
+            importDisabled={Boolean(login)}
+            onImport={() => setImportOpen(true)}
             refreshAllLabel={t('workbuddyAccounts.refreshAll')}
             refreshingAll={refreshAllMutation.isPending}
             onRefreshAll={() => refreshAllMutation.mutate()}
@@ -264,6 +299,7 @@ export function WorkBuddyAccountsDraw({
                   toggleDisabled={updateMutation.isPending || reauthRequired}
                   toggleLabel={t('workbuddyAccounts.toggleLabel', { name })}
                   onToggle={(enabled) => updateMutation.mutate({ account, enabled })}
+                  pills={account.region ? <Badge variant="neutral">{regionLabel(account.region)}</Badge> : undefined}
                   detail={<WorkBuddyQuota account={account} />}
                   message={account.sync_message || undefined}
                   modelCountLabel={`${account.model_count ?? account.models?.length ?? 0} ${t('accountModels.available')}`}
@@ -278,7 +314,7 @@ export function WorkBuddyAccountsDraw({
                           disabled={Boolean(login)}
                           title={t('workbuddyAccounts.reauthorize')}
                           aria-label={t('workbuddyAccounts.reauthorize')}
-                          onClick={() => startLogin('reauth', account.credential_id)}
+                          onClick={() => startLogin('reauth', account.credential_id, account.region)}
                         >
                           <KeyRound className="h-3.5 w-3.5" />
                         </Button>
@@ -292,7 +328,7 @@ export function WorkBuddyAccountsDraw({
                         aria-label={t('workbuddyAccounts.refresh')}
                         onClick={() => refreshMutation.mutate(account)}
                       >
-                        {refreshing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                        {refreshing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
                       </Button>
                       <Button
                         size="icon"
@@ -315,6 +351,69 @@ export function WorkBuddyAccountsDraw({
           <p className="py-10 text-center text-body text-label-2">{t('workbuddyAccounts.empty')}</p>
         )}
       </AccountsListDialog>
+
+      <Dialog open={regionPickOpen} onOpenChange={setRegionPickOpen}>
+        <DialogContent presentation="center" size="sm" overlayClassName={nestedZ.overlayClassName} className={nestedZ.className}>
+          <DialogHeader className="border-b-0 pb-2"><DialogTitle>{t('workbuddyAccounts.regionDialog.title')}</DialogTitle></DialogHeader>
+          <DialogBody className="space-y-3 pt-0">
+            <DialogDescription className="mt-0">{t('workbuddyAccounts.regionDialog.description')}</DialogDescription>
+            {regionsQuery.isLoading ? (
+              <p className="flex items-center gap-2 text-body text-label-2"><LoaderCircle className="h-4 w-4 animate-spin" />{t('workbuddyAccounts.loading')}</p>
+            ) : regionsQuery.isError ? (
+              <p className="text-body text-danger">{regionsQuery.error.message}</p>
+            ) : (
+              <div role="radiogroup" className="space-y-2">
+                {regions.map((region) => {
+                  const selected = (pickedRegion || defaultRegion) === region.id
+                  const hint = t(`workbuddyAccounts.regionDialog.${region.id}Hint`, { defaultValue: '' })
+                  return (
+                    <button
+                      key={region.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setPickedRegion(region.id)}
+                      className={cn(
+                        'w-full rounded-inner border px-3 py-2.5 text-left transition-colors',
+                        selected ? 'border-tint bg-tint/5' : 'border-separator bg-elevated-1 hover:border-tint/50 hover:bg-fill-3',
+                      )}
+                    >
+                      <span className="block text-body font-medium text-label">{regionLabel(region.id)}</span>
+                      {hint ? <span className="block text-footnote text-label-2">{hint}</span> : null}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </DialogBody>
+          <DialogFooter
+            className="border-t-0 pt-2"
+            cancel={<Button variant="secondary" onClick={() => setRegionPickOpen(false)}>{t('workbuddyAccounts.cancel')}</Button>}
+            confirm={(
+              <Button
+                disabled={!regions.length || Boolean(login)}
+                onClick={() => {
+                  const region = pickedRegion || defaultRegion
+                  setRegionPickOpen(false)
+                  void startLogin('add', undefined, region)
+                }}
+              >
+                {t('workbuddyAccounts.regionDialog.continue')}
+              </Button>
+            )}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {site ? (
+        <WorkBuddyImportDialog
+          open={importOpen}
+          siteId={site.id}
+          regionLabel={regionLabel}
+          onOpenChange={setImportOpen}
+          onImported={refreshAccountQueries}
+        />
+      ) : null}
 
       <Dialog open={Boolean(login)} onOpenChange={(next) => { if (!next) setLogin(null) }}>
         <DialogContent presentation="center" size="sm" overlayClassName={nestedZ.overlayClassName} className={nestedZ.className}>

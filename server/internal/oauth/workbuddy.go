@@ -17,11 +17,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"xlyra/server/internal/adapter"
+	"xlyra/server/internal/protocolspec"
 	"xlyra/server/internal/store"
 )
 
-// WorkBuddy (Tencent CodeBuddy CN) login.
+// WorkBuddy (Tencent CodeBuddy) login, for the China site and the international
+// site. Hosts, origins and request paths come from protocol_specs.json
+// (providers.workbuddy), the accounts record which site they belong to.
 //
 // The CLI login is not a standard OAuth device flow:
 //
@@ -34,10 +36,6 @@ import (
 // Every response is wrapped in {code, msg, data}. The state is bound to a
 // cookie session on the server, so start and poll must share a cookie jar.
 const (
-	workBuddyAuthStatePath    = "/v2/plugin/auth/state?platform=CLI"
-	workBuddyAuthTokenPath    = "/v2/plugin/auth/token"
-	workBuddyTokenRefreshPath = "/v2/plugin/auth/token/refresh"
-
 	workBuddyCodeLoginPending = 11217
 	workBuddyLoginTTL         = 5 * time.Minute
 	workBuddyPollInterval     = 3
@@ -45,8 +43,33 @@ const (
 	workBuddyResponseLimit    = 1 << 20
 )
 
-// workBuddyBaseURL is a variable so tests can point it at a local server.
-var workBuddyBaseURL = adapter.WorkBuddyBaseURL
+func workBuddySpec() protocolspec.WorkBuddySpec {
+	return protocolspec.MustWorkBuddy()
+}
+
+// workBuddyBaseURLOverride lets tests point every region at a local server.
+var workBuddyBaseURLOverride string
+
+func workBuddyBaseURL(region protocolspec.WorkBuddyRegion) string {
+	if workBuddyBaseURLOverride != "" {
+		return workBuddyBaseURLOverride
+	}
+	return region.BaseURL
+}
+
+// ResolveWorkBuddyRegion maps a region id (empty selects the default) to its
+// spec entry.
+func ResolveWorkBuddyRegion(id string) (protocolspec.WorkBuddyRegion, error) {
+	spec := workBuddySpec()
+	if strings.TrimSpace(id) == "" {
+		return spec.Default(), nil
+	}
+	region, ok := spec.ResolveRegion(id, "")
+	if !ok {
+		return protocolspec.WorkBuddyRegion{}, fmt.Errorf("unknown workbuddy region %q", id)
+	}
+	return region, nil
+}
 
 var (
 	ErrWorkBuddyAuthorizationPending    = errors.New("workbuddy authorization pending")
@@ -54,6 +77,7 @@ var (
 )
 
 type WorkBuddyLoginStart struct {
+	Region    string    `json:"region"`
 	State     string    `json:"state"`
 	AuthURL   string    `json:"auth_url"`
 	Interval  int       `json:"interval"`
@@ -65,12 +89,15 @@ type WorkBuddyTokens struct {
 	RefreshToken string
 	ExpiresAt    time.Time
 	Domain       string
-	Email        string
-	Subject      string
+	// Realm is the id of the WorkBuddy site (region) the account belongs to.
+	Realm   string
+	Email   string
+	Subject string
 }
 
 type workBuddyLoginSession struct {
 	client    *http.Client
+	region    protocolspec.WorkBuddyRegion
 	siteID    uuid.UUID
 	expiresAt time.Time
 }
@@ -99,13 +126,13 @@ type workBuddyTokenData struct {
 	Domain           string `json:"domain"`
 }
 
-func workBuddyRequestHeaders(req *http.Request) {
+func workBuddyRequestHeaders(req *http.Request, region protocolspec.WorkBuddyRegion) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/plain, */*")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	req.Header.Set("Origin", adapter.WorkBuddyOrigin)
-	req.Header.Set("Referer", adapter.WorkBuddyOrigin+"/")
-	req.Header.Set("User-Agent", adapter.WorkBuddyUserAgent)
+	req.Header.Set("Origin", region.Origin)
+	req.Header.Set("Referer", region.Origin+"/")
+	req.Header.Set("User-Agent", workBuddySpec().Client.UserAgent)
 }
 
 // workBuddyDo executes one request and decodes the {code,msg,data} envelope.
@@ -151,16 +178,22 @@ func (s *Service) workBuddyAPIClient(ctx context.Context, siteID uuid.UUID) (*ht
 	return s.grokHTTPClient(ctx, siteID)
 }
 
-func (s *Service) StartWorkBuddyLogin(ctx context.Context, siteID uuid.UUID) (WorkBuddyLoginStart, error) {
+// StartWorkBuddyLogin begins a browser login against the given site; an empty
+// regionID selects the default (China) site.
+func (s *Service) StartWorkBuddyLogin(ctx context.Context, siteID uuid.UUID, regionID string) (WorkBuddyLoginStart, error) {
+	region, err := ResolveWorkBuddyRegion(regionID)
+	if err != nil {
+		return WorkBuddyLoginStart{}, err
+	}
 	client, err := s.workBuddyLoginClient(ctx, siteID)
 	if err != nil {
 		return WorkBuddyLoginStart{}, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, workBuddyBaseURL+workBuddyAuthStatePath, bytes.NewReader([]byte("{}")))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, workBuddyBaseURL(region)+workBuddySpec().Endpoints.AuthState, bytes.NewReader([]byte("{}")))
 	if err != nil {
 		return WorkBuddyLoginStart{}, fmt.Errorf("create workbuddy auth state request: %w", err)
 	}
-	workBuddyRequestHeaders(req)
+	workBuddyRequestHeaders(req, region)
 	envelope, status, err := workBuddyDo(client, req)
 	if err != nil {
 		return WorkBuddyLoginStart{}, fmt.Errorf("request workbuddy auth state: %w", err)
@@ -178,9 +211,10 @@ func (s *Service) StartWorkBuddyLogin(ctx context.Context, siteID uuid.UUID) (Wo
 		return WorkBuddyLoginStart{}, fmt.Errorf("workbuddy auth state response was incomplete")
 	}
 	expiresAt := time.Now().Add(workBuddyLoginTTL)
-	workBuddyLogins.Store(data.State, &workBuddyLoginSession{client: client, siteID: siteID, expiresAt: expiresAt})
+	workBuddyLogins.Store(data.State, &workBuddyLoginSession{client: client, region: region, siteID: siteID, expiresAt: expiresAt})
 	pruneWorkBuddyLogins()
 	return WorkBuddyLoginStart{
+		Region:    region.ID,
 		State:     data.State,
 		AuthURL:   data.AuthURL,
 		Interval:  workBuddyPollInterval,
@@ -217,12 +251,12 @@ func (s *Service) PollWorkBuddyLogin(ctx context.Context, siteID uuid.UUID, stat
 		workBuddyLogins.Delete(state)
 		return WorkBuddyTokens{}, fmt.Errorf("workbuddy login expired, please start again")
 	}
-	endpoint := workBuddyBaseURL + workBuddyAuthTokenPath + "?state=" + url.QueryEscape(state)
+	endpoint := workBuddyBaseURL(session.region) + workBuddySpec().Endpoints.AuthToken + "?state=" + url.QueryEscape(state)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return WorkBuddyTokens{}, fmt.Errorf("create workbuddy token request: %w", err)
 	}
-	workBuddyRequestHeaders(req)
+	workBuddyRequestHeaders(req, session.region)
 	envelope, status, err := workBuddyDo(session.client, req)
 	if err != nil {
 		if status == 0 {
@@ -242,7 +276,9 @@ func (s *Service) PollWorkBuddyLogin(ctx context.Context, siteID uuid.UUID, stat
 		return WorkBuddyTokens{}, ErrWorkBuddyAuthorizationPending
 	}
 	workBuddyLogins.Delete(state)
-	return workBuddyTokensFromData(time.Now(), data, ""), nil
+	tokens := workBuddyTokensFromData(time.Now(), data, "")
+	tokens.Realm = session.region.ID
+	return tokens, nil
 }
 
 // RefreshWorkBuddyTokens exchanges the refresh token for a new token bundle.
@@ -254,11 +290,12 @@ func (s *Service) RefreshWorkBuddyTokens(ctx context.Context, siteID uuid.UUID, 
 	if err != nil {
 		return WorkBuddyTokens{}, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, workBuddyBaseURL+workBuddyTokenRefreshPath, bytes.NewReader([]byte("{}")))
+	region := workBuddySpec().RegionOrDefault(current.Realm, current.Domain)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, workBuddyBaseURL(region)+workBuddySpec().Endpoints.TokenRefresh, bytes.NewReader([]byte("{}")))
 	if err != nil {
 		return WorkBuddyTokens{}, fmt.Errorf("create workbuddy refresh request: %w", err)
 	}
-	workBuddyRequestHeaders(req)
+	workBuddyRequestHeaders(req, region)
 	req.Header.Set("X-Refresh-Token", strings.TrimSpace(current.RefreshToken))
 	req.Header.Set("X-Auth-Refresh-Source", "workbuddy")
 	if current.Domain != "" {
@@ -281,7 +318,9 @@ func (s *Service) RefreshWorkBuddyTokens(ctx context.Context, siteID uuid.UUID, 
 	if err := json.Unmarshal(envelope.Data, &data); err != nil || strings.TrimSpace(data.AccessToken) == "" {
 		return WorkBuddyTokens{}, fmt.Errorf("workbuddy refresh response missing accessToken")
 	}
-	return workBuddyTokensFromData(time.Now(), data, current.Domain), nil
+	tokens := workBuddyTokensFromData(time.Now(), data, current.Domain)
+	tokens.Realm = region.ID
+	return tokens, nil
 }
 
 func workBuddyTokensFromData(now time.Time, data workBuddyTokenData, fallbackDomain string) WorkBuddyTokens {
@@ -343,6 +382,9 @@ type WorkBuddyCredentialBundle struct {
 	RefreshToken string `json:"refresh_token"`
 	ExpiresAt    int64  `json:"expires_at"`
 	Domain       string `json:"domain,omitempty"`
+	// Realm is the id of the WorkBuddy site (region); empty means the default
+	// site, for accounts stored before regions were recorded.
+	Realm string `json:"realm,omitempty"`
 }
 
 func WorkBuddyBundleFromTokens(t WorkBuddyTokens) WorkBuddyCredentialBundle {
@@ -355,6 +397,7 @@ func WorkBuddyBundleFromTokens(t WorkBuddyTokens) WorkBuddyCredentialBundle {
 		RefreshToken: t.RefreshToken,
 		ExpiresAt:    exp,
 		Domain:       t.Domain,
+		Realm:        t.Realm,
 	}
 }
 
@@ -387,41 +430,56 @@ func workBuddyBundleFresh(bundle WorkBuddyCredentialBundle) bool {
 	return time.Until(time.Unix(expiresAt, 0)) > workBuddyRefreshLead
 }
 
-// EnsureWorkBuddyAccessToken returns a valid access token and the tenant
-// domain for one account credential, refreshing and persisting it when needed.
-func (s *Service) EnsureWorkBuddyAccessToken(ctx context.Context, credentialID uuid.UUID) (string, string, error) {
+// WorkBuddyAccess is everything needed to call WorkBuddy as one account: the
+// access token, the tenant domain (X-Domain) and the site the account lives on.
+type WorkBuddyAccess struct {
+	Token  string
+	Domain string
+	Region protocolspec.WorkBuddyRegion
+}
+
+// EnsureWorkBuddyAccess returns a valid access for one account credential,
+// refreshing and persisting the tokens when needed.
+func (s *Service) EnsureWorkBuddyAccess(ctx context.Context, credentialID uuid.UUID) (WorkBuddyAccess, error) {
 	if s.db == nil {
-		return "", "", fmt.Errorf("oauth store is not available")
+		return WorkBuddyAccess{}, fmt.Errorf("oauth store is not available")
 	}
 	cred, err := store.NewSiteCredentialRepository(s.db.DB()).GetByID(ctx, credentialID)
 	if err != nil {
-		return "", "", fmt.Errorf("load workbuddy credential: %w", err)
+		return WorkBuddyAccess{}, fmt.Errorf("load workbuddy credential: %w", err)
 	}
 	decrypted, err := s.credentials.Decrypt(cred.EncryptedSecret)
 	if err != nil {
-		return "", "", fmt.Errorf("decrypt workbuddy credential: %w", err)
+		return WorkBuddyAccess{}, fmt.Errorf("decrypt workbuddy credential: %w", err)
 	}
 	bundle, err := DecodeWorkBuddyBundle(decrypted)
 	if err != nil {
-		return "", "", err
+		return WorkBuddyAccess{}, err
 	}
 	if bundle.AccessToken != "" && workBuddyBundleFresh(bundle) {
-		return bundle.AccessToken, bundle.Domain, nil
+		return workBuddyAccessFromBundle(bundle), nil
 	}
 	if strings.TrimSpace(bundle.RefreshToken) == "" {
 		if strings.TrimSpace(bundle.AccessToken) == "" {
-			return "", "", fmt.Errorf("workbuddy credential is missing tokens")
+			return WorkBuddyAccess{}, fmt.Errorf("workbuddy credential is missing tokens")
 		}
-		return "", "", fmt.Errorf("%w: access token is expired or has unknown expiry and no refresh token is available", ErrWorkBuddyReauthorizationRequired)
+		return WorkBuddyAccess{}, fmt.Errorf("%w: access token is expired or has unknown expiry and no refresh token is available", ErrWorkBuddyReauthorizationRequired)
 	}
 	result, err, _ := s.refreshGroup.Do("workbuddy:"+credentialID.String(), func() (any, error) {
 		return s.refreshWorkBuddyCredentialOnce(ctx, cred.ID, cred.SiteID, bundle)
 	})
 	if err != nil {
-		return "", "", err
+		return WorkBuddyAccess{}, err
 	}
-	next := result.(WorkBuddyCredentialBundle)
-	return next.AccessToken, next.Domain, nil
+	return workBuddyAccessFromBundle(result.(WorkBuddyCredentialBundle)), nil
+}
+
+func workBuddyAccessFromBundle(bundle WorkBuddyCredentialBundle) WorkBuddyAccess {
+	return WorkBuddyAccess{
+		Token:  bundle.AccessToken,
+		Domain: bundle.Domain,
+		Region: workBuddySpec().RegionOrDefault(bundle.Realm, bundle.Domain),
+	}
 }
 
 func (s *Service) refreshWorkBuddyCredentialOnce(ctx context.Context, credentialID uuid.UUID, siteID uuid.UUID, current WorkBuddyCredentialBundle) (WorkBuddyCredentialBundle, error) {

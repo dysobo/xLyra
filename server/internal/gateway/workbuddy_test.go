@@ -134,3 +134,22 @@ func TestWorkBuddyChatAdapterBuffersStreamedResponse(t *testing.T) {
 		t.Fatalf("blocked phrase was not rewritten: %q", system)
 	}
 }
+
+func TestWorkBuddyInternationalAccountsUseTheirOwnSite(t *testing.T) {
+	candidate := routeengine.Candidate{}
+	candidate.Site.SiteType = "workbuddy"
+	candidate.Model.UpstreamName = "glm-5.2"
+	request := gatewayRequest{DownstreamPath: gatewayEndpointChatCompletions, Payload: map[string]any{"model": "glm-5.2", "messages": []any{}}}
+	protocol := newOpenAIChatProtocolAdapter(request, candidate)
+
+	// The gateway passes the account's site base URL to UpstreamPath.
+	if got := protocol.UpstreamPath("https://www.codebuddy.ai"); got != "https://www.codebuddy.ai/v2/chat/completions" {
+		t.Fatalf("international upstream path = %q", got)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "https://www.codebuddy.ai/v2/chat/completions", nil)
+	protocol.ApplyUpstreamHeaders(req, "token-1", "www.codebuddy.ai", true)
+	if req.Header.Get("Origin") != "https://www.codebuddy.ai" || req.Header.Get("Referer") != "https://www.codebuddy.ai/" {
+		t.Fatalf("international headers = %v", req.Header)
+	}
+}

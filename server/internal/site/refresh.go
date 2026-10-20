@@ -16,6 +16,7 @@ import (
 	"xlyra/server/internal/adapter"
 	"xlyra/server/internal/catalog"
 	"xlyra/server/internal/modelcapabilities"
+	oauthsvc "xlyra/server/internal/oauth"
 	"xlyra/server/internal/protocolspec"
 	"xlyra/server/internal/store"
 	"xlyra/server/internal/upstream"
@@ -1143,16 +1144,20 @@ func (s *Service) RefreshSingleAPIKey(ctx context.Context, siteID uuid.UUID, cre
 		_ = json.Unmarshal(credential.Meta, &meta)
 	}
 	apiKey := strings.TrimSpace(secretFromCredentialMeta(secret, meta))
+	var workBuddyAccess *oauthsvc.WorkBuddyAccess
 	if strings.EqualFold(strings.TrimSpace(site.SiteType), "grok") {
 		apiKey, err = s.oauth.EnsureGrokAccessToken(ctx, credential.ID)
 		if err != nil {
 			return RefreshSingleAPIKeyResult{}, fmt.Errorf("grok access token: %w", err)
 		}
 	} else if isWorkBuddySiteType(site.SiteType) {
-		apiKey, _, err = s.oauth.EnsureWorkBuddyAccessToken(ctx, credential.ID)
+		var access oauthsvc.WorkBuddyAccess
+		access, err = s.oauth.EnsureWorkBuddyAccess(ctx, credential.ID)
 		if err != nil {
 			return RefreshSingleAPIKeyResult{}, fmt.Errorf("workbuddy access token: %w", err)
 		}
+		apiKey = access.Token
+		workBuddyAccess = &access
 	}
 	if apiKey == "" || strings.HasPrefix(apiKey, "missing-api-key") {
 		return RefreshSingleAPIKeyResult{}, fmt.Errorf("raw api key is not available for this credential")
@@ -1160,6 +1165,9 @@ func (s *Service) RefreshSingleAPIKey(ctx context.Context, siteID uuid.UUID, cre
 
 	now := time.Now()
 	adapterSite := s.toAdapterSite(ctx, site)
+	if workBuddyAccess != nil {
+		adapterSite = workBuddySiteConfig(adapterSite, *workBuddyAccess)
+	}
 	apiKeyStateRepo := store.NewSiteAPIKeyStateRepository(s.db.DB())
 	apiKeyModelRepo := store.NewSiteAPIKeyModelRepository(s.db.DB())
 

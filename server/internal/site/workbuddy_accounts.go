@@ -26,13 +26,16 @@ type WorkBuddyAccountUpdate struct {
 }
 
 type WorkBuddyAccount struct {
-	CredentialID uuid.UUID          `json:"credential_id"`
-	MaskedToken  string             `json:"masked_token"`
-	Enabled      bool               `json:"enabled"`
-	SyncStatus   string             `json:"sync_status,omitempty"`
-	SyncMessage  string             `json:"sync_message,omitempty"`
-	ModelCount   int                `json:"model_count"`
-	Models       []GrokAccountModel `json:"models"`
+	CredentialID uuid.UUID `json:"credential_id"`
+	MaskedToken  string    `json:"masked_token"`
+	Enabled      bool      `json:"enabled"`
+	// Region is the WorkBuddy site the account is logged in to ("cn" or "intl"),
+	// as configured in protocol_specs.json.
+	Region      string             `json:"region"`
+	SyncStatus  string             `json:"sync_status,omitempty"`
+	SyncMessage string             `json:"sync_message,omitempty"`
+	ModelCount  int                `json:"model_count"`
+	Models      []GrokAccountModel `json:"models"`
 	// Quota is reported in credits; QuotaLimit/Packages come from the last
 	// refresh (zero/empty until the account has been refreshed once).
 	RemainingQuota *int64                  `json:"remaining_quota,omitempty"`
@@ -250,6 +253,7 @@ func (s *Service) CompleteWorkBuddyLogin(ctx context.Context, siteID uuid.UUID, 
 	if strings.TrimSpace(tokens.Subject) == "" {
 		tokens.Subject = oauthsvc.WorkBuddyTokenIdentity(tokens.AccessToken)
 	}
+	tokens.Realm = workBuddySpec().RegionOrDefault(tokens.Realm, tokens.Domain).ID
 	defer s.siteLocks.lock(siteID)()
 	secret, err := oauthsvc.EncodeWorkBuddyBundle(oauthsvc.WorkBuddyBundleFromTokens(tokens))
 	if err != nil {
@@ -287,6 +291,7 @@ func (s *Service) CompleteWorkBuddyLogin(ctx context.Context, siteID uuid.UUID, 
 		if value := strings.TrimSpace(tokens.Domain); value != "" {
 			meta["domain"] = value
 		}
+		meta["realm"] = tokens.Realm
 		encodedMeta, err := json.Marshal(meta)
 		if err != nil {
 			return fmt.Errorf("marshal workbuddy account meta: %w", err)
@@ -419,6 +424,7 @@ func workBuddyAccountFromStore(credential store.SiteCredential, state store.Site
 		CredentialID: credential.ID,
 		MaskedToken:  label,
 		Enabled:      enabled,
+		Region:       workBuddySpec().RegionOrDefault(anyString(meta["realm"]), anyString(meta["domain"])).ID,
 		SyncStatus:   state.SyncStatus,
 		ModelCount:   modelCount,
 		Models:       accountModels,
@@ -477,13 +483,13 @@ func (s *Service) RefreshWorkBuddyAccount(ctx context.Context, siteID uuid.UUID,
 	if !ok {
 		return WorkBuddyAccount{}, fmt.Errorf("workbuddy adapter does not support account refresh")
 	}
-	token, _, err := s.oauth.EnsureWorkBuddyAccessToken(ctx, credential.ID)
+	access, err := s.oauth.EnsureWorkBuddyAccess(ctx, credential.ID)
 	if err != nil {
 		wrapped := fmt.Errorf("workbuddy account token: %w", err)
 		s.recordWorkBuddyRefreshFailure(ctx, credential, wrapped)
 		return WorkBuddyAccount{}, wrapped
 	}
-	summary, err := fetcher.SummarizeAPIKey(ctx, s.toAdapterSite(ctx, site), token)
+	summary, err := fetcher.SummarizeAPIKey(ctx, workBuddySiteConfig(s.toAdapterSite(ctx, site), access), access.Token)
 	if err != nil {
 		s.recordWorkBuddyRefreshFailure(ctx, credential, err)
 		return WorkBuddyAccount{}, err

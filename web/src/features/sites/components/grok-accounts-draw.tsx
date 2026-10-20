@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ExternalLink, KeyRound, LoaderCircle, RefreshCw, Trash2 } from 'lucide-react'
+import { ExternalLink, KeyRound, LoaderCircle, RotateCcw, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -288,7 +288,7 @@ export function GrokAccountsDraw({
                         aria-label={t('grokAccounts.refresh')}
                         onClick={() => refreshMutation.mutate(account)}
                       >
-                        {refreshing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                        {refreshing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
                       </Button>
                       <Button
                         size="icon"

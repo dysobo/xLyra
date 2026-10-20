@@ -142,6 +142,16 @@ export function isAccountLoginSiteType(siteType: string | null | undefined): boo
   return type === 'grok' || type === 'workbuddy'
 }
 
+/**
+ * 账号登录站点的「有效 / 总数」。后端按已存账号统计；旧响应缺少该字段时，
+ * 退回站点状态里的账号数，并视为全部有效。
+ */
+export function siteAccountCounts(site: Pick<Site, 'account_count' | 'valid_account_count' | 'api_key_count'>): { valid: number; total: number } {
+  const total = Math.max(site.account_count ?? site.api_key_count ?? 0, 0)
+  const valid = Math.min(Math.max(site.valid_account_count ?? total, 0), total)
+  return { valid, total }
+}
+
 export function siteTypeIconClassName(siteType: string): string | undefined {
   if (siteType === 'grok') return 'bg-white p-1'
   return undefined

@@ -16,6 +16,7 @@ import {
   formatRoutingPriority,
   formatSiteBalance,
   isAccountLoginSiteType,
+  siteAccountCounts,
   isOAuthSite,
   isSub2APIQuotaSite,
   isSiteEnableBlockedByAbnormalState,
@@ -241,7 +242,7 @@ function MobileSiteCard({
         {isGrok ? (
           <CardMetric
             label={t('table.headers.accounts')}
-            value={t('table.resources.accounts', { count: site.grok_account_count ?? site.api_key_count ?? 0 })}
+            value={t('table.resources.accounts', siteAccountCounts(site))}
             onClick={() => onOpenGrokAccounts(site)}
           />
         ) : keyInfo ? (
