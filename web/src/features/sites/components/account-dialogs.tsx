@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { LoaderCircle, RotateCcw, Settings2, Upload } from 'lucide-react'
+import { LoaderCircle, Plus, RotateCcw, Settings2, Upload } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ModelsDraw, type ModelsDrawItem } from '@/components/common/models-draw'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,7 @@ import { formatEndpointTypeLabel } from '@/features/models/lib/model-helpers'
 import { modelNameIconInfo } from '@/features/sites/lib/model-icon'
 import type { AccountModel } from '@/features/sites/api/sites'
 import { useMobileLayout } from '@/hooks/use-media-query'
+import { cn } from '@/lib/utils'
 
 /**
  * Shared dialogs for OAuth account sites (Grok, WorkBuddy). They follow the
@@ -66,7 +67,7 @@ export function AccountsListDialog({
     return (
       <Sheet open={open} onOpenChange={handleOpenChange}>
         <SheetContent>
-          <SheetHeader className="flex items-center justify-between gap-3">
+          <SheetHeader className="flex items-center justify-between gap-2">
             <SheetTitle>{title}</SheetTitle>
             {headerActions}
           </SheetHeader>
@@ -104,8 +105,10 @@ export function AccountsListDialog({
 }
 
 /**
- * Header actions: the primary "add" button, an optional "import" button on its
- * left, plus a quiet refresh-all icon.
+ * Header actions, shared by the account and API key managers: a refresh-all
+ * icon, an optional import button and the primary "add" button. Desktop shows
+ * the labelled buttons; the mobile draw shows icons only so everything fits in
+ * the title row next to the title.
  */
 export function AccountHeaderActions({
   addLabel,
@@ -116,48 +119,66 @@ export function AccountHeaderActions({
   onImport,
   refreshAllLabel,
   refreshingAll,
+  refreshAllDisabled,
   onRefreshAll,
 }: {
   addLabel: string
   addDisabled?: boolean
-  onAdd: () => void
+  /** Omit to hide the add button (e.g. sites that cannot add keys by hand). */
+  onAdd?: () => void
   importLabel?: string
   importDisabled?: boolean
   onImport?: () => void
   refreshAllLabel: string
   refreshingAll?: boolean
+  refreshAllDisabled?: boolean
   onRefreshAll: () => void
 }) {
+  const isMobile = useMobileLayout()
+  const showImport = Boolean(onImport && importLabel)
   return (
-    <div className="flex items-center gap-2">
+    <div className={cn('flex shrink-0 items-center', isMobile ? 'gap-1' : 'gap-2')}>
       <Button
         size="icon"
         variant="ghost"
         className="h-8 w-8"
         title={refreshAllLabel}
         aria-label={refreshAllLabel}
-        disabled={refreshingAll}
+        disabled={refreshingAll || refreshAllDisabled}
         onClick={onRefreshAll}
       >
         {refreshingAll ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
       </Button>
-      {onImport && importLabel ? (
-        <Button size="sm" variant="secondary" disabled={importDisabled} onClick={onImport}>
-          <Upload className="h-3.5 w-3.5" />
-          {importLabel}
-        </Button>
+      {showImport ? (
+        isMobile ? (
+          <Button size="icon" variant="ghost" className="h-8 w-8" title={importLabel} aria-label={importLabel} disabled={importDisabled} onClick={onImport}>
+            <Upload className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button size="sm" variant="secondary" disabled={importDisabled} onClick={onImport}>
+            <Upload className="h-3.5 w-3.5" />
+            {importLabel}
+          </Button>
+        )
       ) : null}
-      <Button size="sm" disabled={addDisabled} onClick={onAdd}>
-        {addLabel}
-      </Button>
+      {onAdd ? (
+        isMobile ? (
+          <Button size="icon" className="h-8 w-8" title={addLabel} aria-label={addLabel} disabled={addDisabled} onClick={onAdd}>
+            <Plus className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button size="sm" disabled={addDisabled} onClick={onAdd}>
+            {addLabel}
+          </Button>
+        )
+      ) : null}
     </div>
   )
 }
 
-/** Same list container as the API key manager: divided rows on desktop, cards on mobile. */
+/** Divided rows without card chrome, the same on desktop and mobile. */
 export function AccountList({ children }: { children: ReactNode }) {
-  const isMobile = useMobileLayout()
-  return <div className={isMobile ? 'space-y-3' : 'divide-y divide-separator'}>{children}</div>
+  return <div className="divide-y divide-separator">{children}</div>
 }
 
 /**
@@ -194,9 +215,8 @@ export function AccountRow({
   onOpenModels: () => void
   actions: ReactNode
 }) {
-  const isMobile = useMobileLayout()
   return (
-    <div className={isMobile ? 'mat-regular space-y-3 rounded-card p-4' : 'space-y-3 py-4 first:pt-0 last:pb-0'}>
+    <div className="space-y-3 py-4 first:pt-0 last:pb-0">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className="truncate text-body font-medium text-label">{name}</span>
