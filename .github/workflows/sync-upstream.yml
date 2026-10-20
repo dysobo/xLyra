@@ -96,4 +96,4 @@ jobs:
         if: steps.merge.outputs.merged == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run "Publish Images" --ref test
+        run: gh workflow run "Publish Images" --repo "${{ github.repository }}" --ref test
