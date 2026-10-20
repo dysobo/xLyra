@@ -1,7 +1,8 @@
 name: Sync from Upstream
 
 # Merge Yachiyo-5i/xLyra test into this fork's test (keeps local theme commits).
-# A successful push to test triggers Publish Images -> GHCR -> 1panel Watchtower.
+# GITHUB_TOKEN pushes do not re-trigger workflows, so after a real merge this
+# job dispatches Publish Images on test -> GHCR -> 1panel Watchtower.
 # Do NOT hard-reset main; that would wipe fork CI on the default branch.
 
 on:
@@ -12,6 +13,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 concurrency:
   group: sync-upstream
@@ -89,3 +91,9 @@ jobs:
             --head "$branch" \
             --title "Upstream sync conflict: merge upstream/test manually" \
             --body "Scheduled sync failed. Conflict branch \`$branch\` was pushed. Resolve in the PR, merge into \`test\`, then Publish Images will rebuild GHCR for Watchtower."
+
+      - name: Trigger Publish Images
+        if: steps.merge.outputs.merged == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run "Publish Images" --ref test

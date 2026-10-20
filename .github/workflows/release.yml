@@ -1,9 +1,8 @@
 name: Release
 
+# This fork skips release-please unless manually run with the secret set.
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: write
