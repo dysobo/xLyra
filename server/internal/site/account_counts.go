@@ -5,6 +5,10 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+<<<<<<< HEAD
+=======
+	"gorm.io/gorm"
+>>>>>>> upstream/test
 
 	"xlyra/server/internal/store"
 )
@@ -17,9 +21,29 @@ type AccountCounts struct {
 }
 
 // IsAccountLoginSite reports whether the site type keeps one credential per
+<<<<<<< HEAD
 // logged-in account (Grok, WorkBuddy).
 func IsAccountLoginSite(siteType string) bool {
 	return isGrokSiteType(siteType) || isWorkBuddySiteType(siteType)
+=======
+// logged-in account.
+func IsAccountLoginSite(siteType string) bool {
+	desc, ok := LookupSiteType(siteType)
+	return ok && siteTypeHasAccounts(desc)
+}
+
+func siteTypeHasAccounts(desc SiteTypeDescriptor) bool {
+	return desc.Accounts != nil
+}
+
+func accountCredentialForSite(siteType, credentialType string) bool {
+	switch {
+	case isGrokSiteType(siteType):
+		return isGrokCredentialType(credentialType)
+	default:
+		return store.IsAccountCredentialTypeOf(credentialType, siteType)
+	}
+>>>>>>> upstream/test
 }
 
 func isGrokSiteType(siteType string) bool {
@@ -48,10 +72,14 @@ func (s *Service) AccountCounts(ctx context.Context, siteID uuid.UUID, siteType 
 		statesByCredential[state.SiteCredentialID] = state
 	}
 	for _, credential := range credentials {
+<<<<<<< HEAD
 		if isGrokSiteType(siteType) && !isGrokCredentialType(credential.CredentialType) {
 			continue
 		}
 		if isWorkBuddySiteType(siteType) && !isWorkBuddyCredentialType(credential.CredentialType) {
+=======
+		if !accountCredentialForSite(siteType, credential.CredentialType) {
+>>>>>>> upstream/test
 			continue
 		}
 		counts.Total++
@@ -64,7 +92,11 @@ func (s *Service) AccountCounts(ctx context.Context, siteID uuid.UUID, siteType 
 }
 
 func accountUsable(credential store.SiteCredential, state store.SiteAPIKeyState, hasState bool) bool {
+<<<<<<< HEAD
 	meta := grokMetaMap(credential.Meta)
+=======
+	meta := accountMetaMap(credential.Meta)
+>>>>>>> upstream/test
 	if boolFromMeta(meta, "reauth_required", false) {
 		return false
 	}
@@ -78,3 +110,27 @@ func accountUsable(credential store.SiteCredential, state store.SiteAPIKeyState,
 	}
 	return enabled
 }
+<<<<<<< HEAD
+=======
+
+func (s *Service) accountPoolCredentialCount(ctx context.Context, siteID uuid.UUID, siteType string) (int, error) {
+	if s == nil || s.db == nil {
+		return 0, nil
+	}
+	return accountPoolCredentialCountDB(ctx, s.db.DB(), siteID, siteType)
+}
+
+func accountPoolCredentialCountDB(ctx context.Context, db *gorm.DB, siteID uuid.UUID, siteType string) (int, error) {
+	credentials, err := store.NewSiteCredentialRepository(db).ListBySite(ctx, siteID)
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	for _, credential := range credentials {
+		if accountCredentialForSite(siteType, credential.CredentialType) {
+			count++
+		}
+	}
+	return count, nil
+}
+>>>>>>> upstream/test

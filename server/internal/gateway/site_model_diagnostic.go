@@ -324,10 +324,51 @@ func (h Handler) forwardSiteModelTestRequest(
 	result.pricingGroup = selectedPricing.GroupName
 	result.pricing = selectedPricing
 
+<<<<<<< HEAD
+=======
+	var headerVars map[string]string
+	pluginBaseURL := ""
+	if selectedCredential != nil && pluginAccountPoolCredential(candidate.Site.SiteType, selectedCredential.Credential.CredentialType) {
+		resolved, failure := (pluginAccountCredentialResolver{}).Resolve(ctx, h, candidate, *selectedCredential, upstreamKey, accountID)
+		if failure != nil {
+			if failure.MarkReauth {
+				message := "plugin account credential failed"
+				if failure.Err != nil {
+					message = failure.Err.Error()
+				}
+				h.markAccountCredentialReauthRequired(ctx, selectedCredential.Credential, message)
+			}
+			result.statusCode = http.StatusBadGateway
+			result.errorType = failure.ErrorType
+			if failure.Err != nil {
+				result.errorMessage = failure.Err.Error()
+			}
+			result.latencyMS = time.Since(startedAt).Milliseconds()
+			result.requestLogID = h.recordAttempt(ctx, requestID, uuid.Nil, canonicalModelID, candidate, result, nil)
+			return result
+		}
+		upstreamKey = resolved.Key
+		if resolved.AccountID != "" {
+			accountID = resolved.AccountID
+		}
+		pluginBaseURL = resolved.BaseURL
+		headerVars = resolved.HeaderVars
+	}
+
+>>>>>>> upstream/test
 	payload, err := buildGatewayUpstreamPayload(protocol, request, candidate)
 	if err != nil {
 		result.statusCode = http.StatusBadRequest
 		result.errorType = "request_encode_failed"
+		result.errorMessage = err.Error()
+		result.latencyMS = time.Since(startedAt).Milliseconds()
+		result.requestLogID = h.recordAttempt(ctx, requestID, uuid.Nil, canonicalModelID, candidate, result, nil)
+		return result
+	}
+	payload, err = applyProviderRewrite(ctx, candidate, protocol, payload)
+	if err != nil {
+		result.statusCode = http.StatusBadGateway
+		result.errorType = "plugin_rewrite_failed"
 		result.errorMessage = err.Error()
 		result.latencyMS = time.Since(startedAt).Milliseconds()
 		result.requestLogID = h.recordAttempt(ctx, requestID, uuid.Nil, canonicalModelID, candidate, result, nil)
@@ -365,11 +406,16 @@ func (h Handler) forwardSiteModelTestRequest(
 	}
 
 	upstreamBaseURL := candidate.Site.BaseURL
+<<<<<<< HEAD
 	if isWorkBuddySite(candidate.Site.SiteType) && selectedCredential != nil && h.oauth != nil {
 		// WorkBuddy accounts live on the China or the international site.
 		if access, accessErr := h.oauth.EnsureWorkBuddyAccess(ctx, selectedCredential.Credential.ID); accessErr == nil {
 			upstreamBaseURL = access.Region.BaseURL
 		}
+=======
+	if pluginBaseURL != "" {
+		upstreamBaseURL = pluginBaseURL
+>>>>>>> upstream/test
 	}
 	endpoint := protocol.UpstreamPath(upstreamBaseURL)
 	result.upstreamPath = endpointPath(endpoint)
@@ -415,9 +461,34 @@ func (h Handler) forwardSiteModelTestRequest(
 	if isOpenCodeZenSite(candidate) {
 		applyOpenCodeGoGatewayHeaders(req, request, upstreamKey)
 	}
+<<<<<<< HEAD
+=======
+	if err := applyPluginRequestHeaders(req, candidate.Site.SiteType, headerVars, upstreamKey, upstreamBaseURL); err != nil {
+		result.statusCode = http.StatusBadGateway
+		result.errorType = "plugin_header_template_failed"
+		result.errorMessage = err.Error()
+		result.latencyMS = time.Since(startedAt).Milliseconds()
+		result.requestLogID = h.recordAttempt(ctx, requestID, uuid.Nil, canonicalModelID, candidate, result, nil)
+		return result
+	}
+>>>>>>> upstream/test
 	if err := signUpstreamRequest(req, protocol, body, upstreamKey); err != nil {
 		result.statusCode = http.StatusBadGateway
 		result.errorType = "upstream_sign_failed"
+		result.errorMessage = err.Error()
+		result.latencyMS = time.Since(startedAt).Milliseconds()
+		result.requestLogID = h.recordAttempt(ctx, requestID, uuid.Nil, canonicalModelID, candidate, result, nil)
+		return result
+	}
+
+	upstreamURL := ""
+	if req.URL != nil {
+		upstreamURL = req.URL.String()
+	}
+	upstreamClient, err = pluginUpstreamClient(candidate.Site.SiteType, upstreamURL, upstreamClient)
+	if err != nil {
+		result.statusCode = http.StatusBadGateway
+		result.errorType = "upstream_host_not_allowed"
 		result.errorMessage = err.Error()
 		result.latencyMS = time.Since(startedAt).Milliseconds()
 		result.requestLogID = h.recordAttempt(ctx, requestID, uuid.Nil, canonicalModelID, candidate, result, nil)

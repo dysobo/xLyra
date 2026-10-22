@@ -37,16 +37,18 @@ const (
 )
 
 type Service struct {
-	db          *store.Store
-	credentials credential.Service
-	adapters    adapter.Registry
-	modelCaps   *modelcapabilities.Service
-	oauth       *oauthsvc.Service
-	httpClients *httpclient.Manager
-	confFile    *config.ConfigFile
-	timeZone    config.TimeZone
-	siteLocks   *siteRefreshLocks
-	jsPlugins   *jsplugin.Registry
+	db              *store.Store
+	credentials     credential.Service
+	adapters        adapter.Registry
+	modelCaps       *modelcapabilities.Service
+	oauth           *oauthsvc.Service
+	httpClients     *httpclient.Manager
+	confFile        *config.ConfigFile
+	timeZone        config.TimeZone
+	siteLocks       *siteRefreshLocks
+	jsPlugins       *jsplugin.Registry
+	accountRuntimes pluginAccountRuntimeSlot
+	pluginLogins    *pluginLoginResults
 }
 
 type CreateSiteParams struct {
@@ -150,16 +152,17 @@ func newServiceWithTimeZone(db *store.Store, masterKey string, timeZone config.T
 		slog.Warn("builtin js plugins unavailable", "error", err)
 	}
 	return &Service{
-		db:          db,
-		credentials: credential.NewService(masterKey),
-		adapters:    adapter.NewRegistry(),
-		modelCaps:   catalog.NewCapabilityService(db),
-		oauth:       oauthService,
-		httpClients: httpClients,
-		confFile:    confFile,
-		timeZone:    timeZone,
-		siteLocks:   newSiteRefreshLocks(),
-		jsPlugins:   plugins,
+		db:           db,
+		credentials:  credential.NewService(masterKey),
+		adapters:     adapter.NewRegistry(),
+		modelCaps:    catalog.NewCapabilityService(db),
+		oauth:        oauthService,
+		httpClients:  httpClients,
+		confFile:     confFile,
+		timeZone:     timeZone,
+		siteLocks:    newSiteRefreshLocks(),
+		jsPlugins:    plugins,
+		pluginLogins: newPluginLoginResults(),
 	}
 }
 
@@ -406,6 +409,20 @@ func validateSiteIDs(ctx context.Context, tx *gorm.DB, siteIDs []uuid.UUID) erro
 	return nil
 }
 
+func (s *Service) SetPluginAdapterModules(modules []adapter.Module) error {
+	if s == nil {
+		return fmt.Errorf("site service is nil")
+	}
+	return s.adapters.SetDynamicModules(modules)
+}
+
+func (s *Service) ModuleForSiteType(siteType string) (adapter.Module, bool) {
+	if s == nil {
+		return nil, false
+	}
+	return s.adapters.ModuleForSiteType(siteType)
+}
+
 func (s *Service) Capabilities(siteType string) []string {
 	module, ok := s.adapters.ModuleForSiteType(siteType)
 	if !ok {
@@ -468,6 +485,26 @@ func (s *Service) Get(ctx context.Context, siteID uuid.UUID) (store.Site, error)
 	return store.NewSiteRepository(s.db.DB()).GetByID(ctx, siteID)
 }
 
+func validatePluginSiteBaseURL(siteType, baseURL string) error {
+	err := CheckPluginHost(siteType, baseURL)
+	if err == nil {
+		return nil
+	}
+	var hostErr *HostNotAllowedError
+	if !errors.As(err, &hostErr) {
+		return err
+	}
+	if hostErr.Reason != "" {
+		return fmt.Errorf("base_url host %q is not allowed: plugin site type %q is unavailable", hostErr.Host, hostErr.SiteType)
+	}
+	item, _ := LookupPluginSiteType(siteType)
+	pluginID := item.PluginID
+	if pluginID == "" {
+		pluginID = hostErr.SiteType
+	}
+	return fmt.Errorf("base_url host %q is not allowed by plugin %s; allowed hosts: %s", hostErr.Host, pluginID, strings.Join(item.Hosts, ", "))
+}
+
 // validateBaseURL restricts a site base_url to http/https with a host. It is a
 // first line of defense against SSRF (rejecting file://, gopher://, etc.); the
 // dial-layer guard in the httpclient blocks non-public IP targets.
@@ -495,8 +532,13 @@ func (s *Service) Create(ctx context.Context, params CreateSiteParams) (store.Si
 	if params.SiteType == "grok" {
 		params.BaseURL = adapter.GrokChatBaseURL
 	}
+<<<<<<< HEAD
 	if params.SiteType == adapter.WorkBuddySiteType {
 		params.BaseURL = adapter.WorkBuddyDefaultBaseURL()
+=======
+	if base, ok := pluginAccountPoolBaseURL(params.SiteType); ok {
+		params.BaseURL = base
+>>>>>>> upstream/test
 	}
 
 	if params.BaseURL == "" {
@@ -516,6 +558,9 @@ func (s *Service) Create(ctx context.Context, params CreateSiteParams) (store.Si
 
 	if _, ok := s.adapters.ModuleForSiteType(params.SiteType); !ok {
 		return store.Site{}, nil, fmt.Errorf("unsupported site_type %q", params.SiteType)
+	}
+	if err := validatePluginSiteBaseURL(params.SiteType, params.BaseURL); err != nil {
+		return store.Site{}, nil, err
 	}
 	if err := s.validateProxyID(params.ProxyID); err != nil {
 		return store.Site{}, nil, err
@@ -609,8 +654,13 @@ func (s *Service) Update(ctx context.Context, params UpdateSiteParams) (store.Si
 	if params.SiteType == "grok" {
 		params.BaseURL = adapter.GrokChatBaseURL
 	}
+<<<<<<< HEAD
 	if params.SiteType == adapter.WorkBuddySiteType {
 		params.BaseURL = adapter.WorkBuddyDefaultBaseURL()
+=======
+	if base, ok := pluginAccountPoolBaseURL(params.SiteType); ok {
+		params.BaseURL = base
+>>>>>>> upstream/test
 	}
 
 	if params.ID == uuid.Nil {
@@ -624,6 +674,9 @@ func (s *Service) Update(ctx context.Context, params UpdateSiteParams) (store.Si
 	}
 	if _, ok := s.adapters.ModuleForSiteType(params.SiteType); !ok {
 		return store.Site{}, nil, fmt.Errorf("unsupported site_type %q", params.SiteType)
+	}
+	if err := validatePluginSiteBaseURL(params.SiteType, params.BaseURL); err != nil {
+		return store.Site{}, nil, err
 	}
 	if err := s.validateProxyID(params.ProxyID); err != nil {
 		return store.Site{}, nil, err
@@ -718,7 +771,7 @@ func shouldDeleteAPIKeyCredentials(existingSiteType string, nextSiteType string,
 func containsAPIKeyCredentialInput(credentials []CredentialInput) bool {
 	for _, input := range credentials {
 		credentialType := normalizeCredentialType(input.Type)
-		if credentialType == defaultCredentialType || strings.HasPrefix(credentialType, defaultCredentialType+":") {
+		if store.IsAPIKeyCredentialType(credentialType) {
 			return true
 		}
 	}
@@ -1044,7 +1097,7 @@ func (s *Service) DeleteAPIKey(ctx context.Context, siteID uuid.UUID, credential
 		if credential.SiteID != siteID {
 			return fmt.Errorf("site credential was not found")
 		}
-		if credential.CredentialType != defaultCredentialType && !strings.HasPrefix(credential.CredentialType, defaultCredentialType+":") {
+		if !store.IsAPIKeyCredentialType(credential.CredentialType) {
 			return fmt.Errorf("site credential is not an api key")
 		}
 
@@ -1160,6 +1213,9 @@ func (s *Service) syncModelsLocked(ctx context.Context, siteID uuid.UUID) (SyncR
 	if err != nil {
 		return SyncResult{}, err
 	}
+	if s.pluginModelsPerAccount(site.SiteType) {
+		return s.syncPluginAccountModelsLocked(ctx, site)
+	}
 
 	module, ok := s.adapters.ModuleForSiteType(site.SiteType)
 	if !ok {
@@ -1170,8 +1226,12 @@ func (s *Service) syncModelsLocked(ctx context.Context, siteID uuid.UUID) (SyncR
 		return SyncResult{}, fmt.Errorf("site_type %q does not support model sync", site.SiteType)
 	}
 	isGrok := strings.EqualFold(strings.TrimSpace(site.SiteType), "grok")
+<<<<<<< HEAD
 	isWorkBuddy := isWorkBuddySiteType(site.SiteType)
 	usesAccountSummary := isGrok || isWorkBuddy
+=======
+	usesAccountSummary := isGrok
+>>>>>>> upstream/test
 	summaryFetcher, hasSummaryFetcher := adapter.AsAPIKeySummaryFetcher(module)
 	if usesAccountSummary && !hasSummaryFetcher {
 		return SyncResult{}, fmt.Errorf("site_type %q does not support account summary", site.SiteType)
@@ -1182,7 +1242,11 @@ func (s *Service) syncModelsLocked(ctx context.Context, siteID uuid.UUID) (SyncR
 		return SyncResult{}, err
 	}
 	if len(apiKeys) == 0 {
+<<<<<<< HEAD
 		if credentialType := CredentialTypeForSiteType(site.SiteType); credentialType == "grok_sso" || credentialType == "workbuddy_oauth" {
+=======
+		if isAccountPoolCategory(CredentialTypeForSiteType(site.SiteType)) {
+>>>>>>> upstream/test
 			return SyncResult{SiteID: site.ID}, nil
 		}
 		return SyncResult{}, fmt.Errorf("site api key is required")
@@ -1257,9 +1321,13 @@ func (s *Service) syncModelsLocked(ctx context.Context, siteID uuid.UUID) (SyncR
 				recoverableKeyError = err
 			}
 			if isGrok {
+<<<<<<< HEAD
 				keySyncStatus = grokRefreshFailureStatus(err)
 			} else if isWorkBuddy {
 				keySyncStatus = workBuddyRefreshFailureStatus(err)
+=======
+				keySyncStatus = accountRefreshFailureStatus(err, shouldReauthorizeGrokCredential)
+>>>>>>> upstream/test
 			}
 			failureParams := store.UpsertSiteAPIKeyStateParams{
 				SiteCredentialID: apiKey.Credential.ID,
@@ -1269,9 +1337,15 @@ func (s *Service) syncModelsLocked(ctx context.Context, siteID uuid.UUID) (SyncR
 				SyncMessage:      err.Error(),
 				LastSyncedAt:     now,
 			}
+<<<<<<< HEAD
 			if isWorkBuddy || isGrok {
 				// A failed refresh must not wipe the last known quota.
 				keepWorkBuddyStateQuota(&failureParams, grokAccountState(ctx, s.db.DB(), apiKey.Credential.ID))
+=======
+			if isGrok {
+				// A failed refresh must not wipe the last known quota.
+				keepAccountStateQuota(&failureParams, accountCredentialState(ctx, s.db.DB(), apiKey.Credential.ID))
+>>>>>>> upstream/test
 			}
 			if _, stateErr := apiKeyStateRepo.Upsert(ctx, failureParams); stateErr != nil {
 				return SyncResult{}, fmt.Errorf("save api key auth failure state: %w", stateErr)
@@ -1301,8 +1375,13 @@ func (s *Service) syncModelsLocked(ctx context.Context, siteID uuid.UUID) (SyncR
 			SyncStatus:       "synced",
 			LastSyncedAt:     now,
 		}
+<<<<<<< HEAD
 		if (isWorkBuddy || isGrok) && accountSummary != nil {
 			applyWorkBuddySummaryToState(&syncedParams, *accountSummary, apiKey.MaskedSecret)
+=======
+		if isGrok && accountSummary != nil {
+			applyAccountSummaryToState(&syncedParams, *accountSummary, apiKey.MaskedSecret)
+>>>>>>> upstream/test
 		}
 		if _, stateErr := apiKeyStateRepo.Upsert(ctx, syncedParams); stateErr != nil {
 			return SyncResult{}, fmt.Errorf("save api key synced state: %w", stateErr)
@@ -1594,7 +1673,7 @@ func syncSiteModelAPIKeySwitches(ctx context.Context, tx store.Tx, siteID uuid.U
 
 	modelName := strings.TrimSpace(model.UpstreamName)
 	for _, credential := range credentials {
-		if !isSiteAPIKeyCredentialType(credential.CredentialType) {
+		if !store.IsAPIKeyCredentialType(credential.CredentialType) {
 			continue
 		}
 		meta := map[string]any{}
@@ -1706,7 +1785,7 @@ func (s *Service) APIKeys(ctx context.Context, siteID uuid.UUID) ([]APIKeyCreden
 
 	result := make([]APIKeyCredential, 0, len(credentials))
 	for _, credential := range credentials {
-		if credential.CredentialType != defaultCredentialType && !strings.HasPrefix(credential.CredentialType, defaultCredentialType+":") {
+		if !store.IsAPIKeyCredentialType(credential.CredentialType) {
 			continue
 		}
 		if credential.CredentialType == defaultCredentialType && hasTokenScopedCredentials(credentials) {
@@ -1749,7 +1828,11 @@ func (s *Service) APIKeys(ctx context.Context, siteID uuid.UUID) ([]APIKeyCreden
 
 func (s *Service) modelSyncCredentials(ctx context.Context, site store.Site) ([]APIKeyCredential, error) {
 	credentialType := CredentialTypeForSiteType(site.SiteType)
+<<<<<<< HEAD
 	if credentialType != "grok_sso" && credentialType != "workbuddy_oauth" {
+=======
+	if !isAccountPoolCategory(credentialType) {
+>>>>>>> upstream/test
 		return s.APIKeys(ctx, site.ID)
 	}
 
@@ -2022,8 +2105,12 @@ func (s *Service) SiteModelEndpointTypes(ctx context.Context, siteModelID uuid.U
 }
 
 func (s *Service) syncSiteModelStatusFromAPIKeyModels(ctx context.Context, siteID uuid.UUID, modelName string, updatedAPIKeyModel store.SiteAPIKeyModel) error {
-	apiKeyModelRepo := store.NewSiteAPIKeyModelRepository(s.db.DB())
-	siteModelRepo := store.NewSiteModelRepository(s.db.DB())
+	return syncSiteModelStatusOn(ctx, s.db.DB(), siteID, modelName, updatedAPIKeyModel)
+}
+
+func syncSiteModelStatusOn(ctx context.Context, db store.Tx, siteID uuid.UUID, modelName string, updatedAPIKeyModel store.SiteAPIKeyModel) error {
+	apiKeyModelRepo := store.NewSiteAPIKeyModelRepository(db)
+	siteModelRepo := store.NewSiteModelRepository(db)
 
 	apiKeyModels, err := apiKeyModelRepo.ListBySite(ctx, siteID)
 	if err != nil {
@@ -2124,7 +2211,7 @@ func (s *Service) apiKeyCredentialMeta(ctx context.Context, siteID uuid.UUID, cr
 	if credential.SiteID != siteID {
 		return store.SiteCredential{}, nil, fmt.Errorf("site credential was not found")
 	}
-	if credential.CredentialType != defaultCredentialType && !strings.HasPrefix(credential.CredentialType, defaultCredentialType+":") {
+	if !store.IsAPIKeyCredentialType(credential.CredentialType) {
 		return store.SiteCredential{}, nil, fmt.Errorf("site credential is not an api key")
 	}
 
@@ -2393,16 +2480,26 @@ func proxyIDFromMeta(raw []byte) string {
 }
 
 func normalizeSiteType(siteType string) string {
-	if strings.TrimSpace(siteType) == "" {
+	siteType = strings.ToLower(strings.TrimSpace(siteType))
+	if siteType == "" {
 		return "openai"
 	}
+	return siteType
+}
 
-	return strings.TrimSpace(siteType)
+func isAccountPoolCategory(cat string) bool {
+	switch cat {
+	case "grok_sso", "account":
+		return true
+	default:
+		return false
+	}
 }
 
 // CredentialTypeForSiteType returns the credential behavior category for a site type:
 // "api_key" for OpenAI-compatible providers, "system_token" for newapi, "xlyra" for xLyra, "oauth" for OAuth providers.
 func CredentialTypeForSiteType(siteType string) string {
+<<<<<<< HEAD
 	switch strings.TrimSpace(strings.ToLower(siteType)) {
 	case "newapi":
 		return "system_token"
@@ -2416,7 +2513,12 @@ func CredentialTypeForSiteType(siteType string) string {
 		return "workbuddy_oauth"
 	default:
 		return "api_key"
+=======
+	if desc, ok := LookupSiteType(siteType); ok {
+		return desc.CredentialCategory
+>>>>>>> upstream/test
 	}
+	return defaultCredentialType
 }
 
 func SupportsMultipleAPIKeys(siteType string) bool {
@@ -2424,8 +2526,8 @@ func SupportsMultipleAPIKeys(siteType string) bool {
 }
 
 func SupportsAPIKeyCostMultiplier(siteType string) bool {
-	normalized := normalizeSiteType(siteType)
-	return strings.EqualFold(normalized, "openai") || strings.EqualFold(normalized, "anthropic") || strings.EqualFold(normalized, "google_gemini")
+	desc, ok := LookupSiteType(normalizeSiteType(siteType))
+	return ok && desc.SupportsAPIKeyCostMultiplier
 }
 
 func normalizeCredentialType(credentialType string) string {
@@ -2519,7 +2621,7 @@ func prepareCreateCredentialInputs(siteType string, inputs []CredentialInput) ([
 	apiKeyCount := 0
 	for _, input := range result {
 		credentialType := normalizeCredentialType(input.Type)
-		if credentialType == defaultCredentialType || strings.HasPrefix(credentialType, defaultCredentialType+":") {
+		if store.IsAPIKeyCredentialType(credentialType) {
 			apiKeyCount++
 		}
 	}
@@ -2528,7 +2630,7 @@ func prepareCreateCredentialInputs(siteType string, inputs []CredentialInput) ([
 	}
 	for index := range result {
 		credentialType := normalizeCredentialType(result[index].Type)
-		isAPIKey := credentialType == defaultCredentialType || strings.HasPrefix(credentialType, defaultCredentialType+":")
+		isAPIKey := store.IsAPIKeyCredentialType(credentialType)
 		if apiKeyCount > 1 && credentialType == defaultCredentialType {
 			result[index].Type = scopedAPIKeyCredentialType()
 		}
@@ -2565,7 +2667,7 @@ func prepareCreateCredentialInputs(siteType string, inputs []CredentialInput) ([
 
 func hasTokenScopedCredentials(credentials []store.SiteCredential) bool {
 	for _, credential := range credentials {
-		if strings.HasPrefix(credential.CredentialType, defaultCredentialType+":") {
+		if strings.HasPrefix(credential.CredentialType, store.CredentialTypeAPIKey+":") {
 			return true
 		}
 	}

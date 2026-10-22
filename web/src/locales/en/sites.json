@@ -99,12 +99,15 @@
     "updatedAtMode": {
       "showAbsolute": "Switch to absolute time",
       "showRelative": "Switch to relative time"
-    }
+    },
+    "providerUnavailable": "Provider plugin disabled",
+    "providerUnavailableHint": "This site type comes from a plugin that is disabled or uninstalled. Site data is kept, but the site is not routed."
   },
   "form": {
     "createTitle": "Add Site",
     "backToProviders": "Back to providers",
     "editTitle": "Edit Site",
+    "pluginTag": "Plugin",
     "sections": {
       "basic": "Basic Info",
       "connection": "Connection",
@@ -222,7 +225,11 @@
       "removeHeader": "Remove Header"
     },
     "grokDeviceHint": "Grok accounts are added after the site is created — open the site's account panel and sign in with the xAI device flow.",
+<<<<<<< HEAD
     "workbuddyLoginHint": "WorkBuddy accounts are added after the site is created — open the site's account panel and sign in to WorkBuddy in your browser."
+=======
+    "accountLoginHint": "Accounts are added after the site is created — open the site's account panel and finish signing in."
+>>>>>>> upstream/test
   },
   "apiKeys": {
     "title": "API Key",
@@ -316,6 +323,78 @@
       "empty": "This model has no configurable protocols"
     }
   },
+<<<<<<< HEAD
+=======
+  "accounts": {
+    "title": "Accounts",
+    "add": "Add account",
+    "import": "Import accounts",
+    "loading": "Loading accounts",
+    "empty": "No accounts",
+    "unnamed": "Account",
+    "refresh": "Refresh account",
+    "refreshAll": "Refresh all",
+    "reauthorize": "Reauthorize account",
+    "delete": "Delete account",
+    "toggleLabel": "Toggle {{name}}",
+    "cancel": "Cancel",
+    "toast": {
+      "created": "Account created",
+      "updateFailed": "Failed to update account",
+      "updated": "Account updated",
+      "deleteFailed": "Failed to delete account",
+      "deleted": "Account deleted",
+      "refreshed": "Account refreshed",
+      "refreshFailed": "Failed to refresh account",
+      "refreshedAll": "All accounts refreshed",
+      "refreshAllPartial": "Some accounts failed to refresh",
+      "refreshAllPartialDesc": "{{count}} account(s) failed to refresh",
+      "refreshAllFailed": "Failed to refresh accounts"
+    },
+    "deleteDialog": {
+      "title": "Delete account",
+      "confirm": "Delete {{name}}? Its status, quota, and model associations will also be removed.",
+      "delete": "Delete"
+    },
+    "login": {
+      "title": "Add account",
+      "reauthTitle": "Reauthorize account",
+      "starting": "Preparing sign-in…",
+      "instructions": "Finish authorization in the page that opened. If it did not open, use the button below.",
+      "authorize": "Open authorization page",
+      "waiting": "Waiting for approval…"
+    },
+    "sync": {
+      "synced": "Synced",
+      "failed": "Failed",
+      "reauthRequired": "Reauthorization required",
+      "stale": "Using last synced models",
+      "partial": "Partial",
+      "unknown": "Not synced"
+    },
+    "regionDialog": {
+      "title": "Choose a region",
+      "description": "Choose the account region. Sign-in continues at that region's address.",
+      "continue": "Continue"
+    },
+    "importDialog": {
+      "title": "Import accounts",
+      "dropzone": "Drop JSON files here, or click to choose",
+      "hint": "Upload account JSON for this site type. The server parses it.",
+      "selectedCount": "{{count}} file(s) selected",
+      "import": "Import",
+      "importWithCount": "Import {{count}} file(s)",
+      "cancel": "Cancel",
+      "done": "Done",
+      "summary": "{{total}} accounts, {{imported}} imported, {{failed}} failed",
+      "imported": "Imported",
+      "failed": "Failed",
+      "unnamed": "Unnamed account",
+      "toastDone": "Account import finished",
+      "toastFailed": "Account import failed"
+    }
+  },
+>>>>>>> upstream/test
   "grokAccounts": {
     "title": "Grok Accounts",
     "add": "Add account",
@@ -368,6 +447,7 @@
       "unknown": "Not synced"
     }
   },
+<<<<<<< HEAD
   "workbuddyAccounts": {
     "title": "WorkBuddy Accounts",
     "add": "Add account",
@@ -452,6 +532,9 @@
       "toastFailed": "Account import failed"
     }
   },
+=======
+
+>>>>>>> upstream/test
   "test": {
     "title": "{{name}} Model Test",
     "headers": {
@@ -531,6 +614,15 @@
       "deleteFailed": "Model deletion failed",
       "deleteSuccess": "Model deleted"
     }
+  },
+
+  "quotaEntries": {
+    "allowance": "Plan allowance",
+    "credits": "Credits",
+    "balance": "Balance",
+    "resetsOn": "resets {{date}}",
+    "expiresOn": "expires {{date}}",
+    "unknown": "Quota not synced yet — refresh the account"
   },
   "utils": {
     "justNow": "just now"

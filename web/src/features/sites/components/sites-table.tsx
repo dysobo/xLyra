@@ -10,7 +10,9 @@ import { cn } from '@/lib/utils'
 import { SiteBalanceCell } from '@/features/sites/components/site-balance-cell'
 import { SiteHealthBadge } from '@/features/sites/components/site-health-badge'
 import { SitePlanBadge } from '@/features/sites/components/site-plan-badge'
+import { ProviderUnavailableBadge } from '@/features/sites/components/provider-unavailable-badge'
 import { SiteTypeBadge } from '@/features/sites/components/site-type-badge'
+import { SiteTypeIcon } from '@/features/sites/components/site-type-icon'
 import type { Site, SiteAPIKey, SiteModel, SiteTypeInfo } from '@/features/sites/api/sites'
 import {
   formatCompactTokens,
@@ -42,7 +44,7 @@ export function SitesTable({
   items, modelsMap, apiKeysMap, validationSnapshots, refreshingSiteIds, togglingSiteId, deletingSiteId,
   abnormalItems = [], abnormalCollapsed = true, onAbnormalCollapsedChange,
   updatedAtMode, now, onUpdatedAtModeChange,
-  onRefresh, onToggleEnabled, onEdit, onDelete, onOpenModels, onOpenAPIKeys, onOpenGrokAccounts, onOpenTest, onOpenUsageSplit, siteTypes,
+  onRefresh, onToggleEnabled, onEdit, onDelete, onOpenModels, onOpenAPIKeys, onOpenAccounts, onOpenTest, onOpenUsageSplit, siteTypes,
   className,
 }: {
   items: Site[]
@@ -64,7 +66,7 @@ export function SitesTable({
   onDelete: (site: Site) => void
   onOpenModels: (site: Site) => void
   onOpenAPIKeys: (site: Site) => void
-  onOpenGrokAccounts: (site: Site) => void
+  onOpenAccounts: (site: Site) => void
   onOpenTest: (site: Site) => void
   onOpenUsageSplit: (site: Site) => void
   siteTypes: SiteTypeInfo[]
@@ -108,11 +110,19 @@ export function SitesTable({
         const icon = siteTypeIcon(site.site_type, siteTypes) || site.icon_url
         return (
           <div className="flex items-center gap-3 min-w-0">
-            {icon ? <img src={icon} alt="" className={cn('h-7 w-7 shrink-0 rounded-inner object-contain', siteTypeIconClassName(site.site_type))} /> : null}
+            <SiteTypeIcon
+              src={icon}
+              name={site.name}
+              empty="hidden"
+              muted={site.provider_status === 'unavailable'}
+              className="h-7 w-7 shrink-0 rounded-inner"
+              imageClassName={siteTypeIconClassName(site.site_type)}
+            />
             <div className="min-w-0 space-y-0.5">
               <div className="flex items-center gap-2">
                 <span className="truncate font-medium text-label">{site.name}</span>
                 <SiteTypeBadge siteType={site.site_type} siteTypes={siteTypes} className="shrink-0 select-none" />
+                <ProviderUnavailableBadge status={site.provider_status} />
                 <SitePlanBadge site={site} />
               </div>
               <div className="text-label-2 truncate text-footnote">
@@ -145,7 +155,11 @@ export function SitesTable({
         const models = modelsMap[site.id] ?? EMPTY_MODELS
         const keys = apiKeysMap[site.id] ?? EMPTY_API_KEYS
         const modelCount = siteModelsDisplayCount(site, models, keys)
+<<<<<<< HEAD
         const isGrok = isAccountLoginSiteType(site.site_type)
+=======
+        const isGrok = isAccountLoginSiteType(site.site_type, siteTypes)
+>>>>>>> upstream/test
         const keyInfo = isOAuthSite(site) || isGrok ? null : { enabled: keys.filter((key) => key.enabled).length, total: keys.length || site.api_key_count || 0 }
         return (
           <div className="flex items-center justify-center gap-1 text-footnote tabular-nums whitespace-nowrap">
@@ -155,7 +169,11 @@ export function SitesTable({
             {isGrok ? (
               <>
                 <span className="text-label-2">/</span>
+<<<<<<< HEAD
                 <button type="button" className="hover:text-label text-label cursor-pointer" onClick={() => onOpenGrokAccounts(site)}>
+=======
+                <button type="button" className="hover:text-label text-label cursor-pointer" onClick={() => onOpenAccounts(site)}>
+>>>>>>> upstream/test
                   {t('table.resources.accounts', siteAccountCounts(site))}
                 </button>
               </>
@@ -312,7 +330,7 @@ export function SitesTable({
       // 操作列固定在右侧：表格横向滚动时编辑 / 删除等按钮始终可见
       meta: { align: 'left' as const, className: 'table-sticky-end', cellClassName: 'px-2', headerClassName: 'px-2' },
     },
-  ], [apiKeysMap, deletingSiteId, i18n.language, modelsMap, now, onDelete, onEdit, onOpenAPIKeys, onOpenGrokAccounts, onOpenModels, onOpenTest, onOpenUsageSplit, onRefresh, onToggleEnabled, onUpdatedAtModeChange, refreshingSiteIds, siteTypes, t, togglingSiteId, updatedAtMode, validationSnapshots])
+  ], [apiKeysMap, deletingSiteId, i18n.language, modelsMap, now, onDelete, onEdit, onOpenAPIKeys, onOpenAccounts, onOpenModels, onOpenTest, onOpenUsageSplit, onRefresh, onToggleEnabled, onUpdatedAtModeChange, refreshingSiteIds, siteTypes, t, togglingSiteId, updatedAtMode, validationSnapshots])
 
   return (
     <DataTable
