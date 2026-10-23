@@ -44,11 +44,16 @@ func (s *Service) runCredentialHealthProbe(ctx context.Context, item store.Site,
 		if probeErr != nil {
 			status := "failed"
 			if isGrok {
+<<<<<<< HEAD
 				s.recordGrokRefreshFailure(ctx, credential.Credential, probeErr)
 				status = grokRefreshFailureStatus(probeErr)
 			} else if isWorkBuddy {
 				s.recordWorkBuddyRefreshFailure(ctx, credential.Credential, probeErr)
 				status = workBuddyRefreshFailureStatus(probeErr)
+=======
+				s.recordAccountRefreshFailure(ctx, credential.Credential, probeErr, shouldReauthorizeGrokCredential)
+				status = accountRefreshFailureStatus(probeErr, shouldReauthorizeGrokCredential)
+>>>>>>> upstream/test
 			}
 			results = append(results, healthProbeCredentialResult(credential, status, probeErr.Error()))
 			continue
@@ -57,14 +62,22 @@ func (s *Service) runCredentialHealthProbe(ctx context.Context, item store.Site,
 		results = append(results, healthProbeCredentialResult(credential, "ok", ""))
 	}
 
+<<<<<<< HEAD
 	if isGrok || isWorkBuddy {
+=======
+	if IsAccountLoginSite(item.SiteType) {
+>>>>>>> upstream/test
 		check.metadata["accounts"] = results
 		check.metadata["accounts_total"] = total
 		check.metadata["accounts_passed"] = passed
 		check.success, check.errorType, check.message = grokHealthOutcome(len(credentials), total, passed)
+<<<<<<< HEAD
 		if isWorkBuddy {
 			check.message = strings.ReplaceAll(check.message, "grok", "workbuddy")
 		}
+=======
+		check.message = accountPoolHealthMessage(item.SiteType, check.message)
+>>>>>>> upstream/test
 	} else {
 		check.metadata["credentials"] = results
 		check.metadata["credentials_total"] = total
@@ -76,16 +89,23 @@ func (s *Service) runCredentialHealthProbe(ctx context.Context, item store.Site,
 }
 
 // resolveHealthProbeCredential returns the token to probe with and the site
+<<<<<<< HEAD
 // config to probe against; WorkBuddy accounts are probed on the site they
 // belong to (China or international).
+=======
+// config to probe against.
+>>>>>>> upstream/test
 func (s *Service) resolveHealthProbeCredential(ctx context.Context, item store.Site, credential APIKeyCredential, site adapter.SiteConfig) (string, adapter.SiteConfig, error) {
 	if CredentialTypeForSiteType(item.SiteType) == "grok_sso" {
 		token, err := s.oauth.EnsureGrokAccessToken(ctx, credential.Credential.ID)
 		return token, site, err
+<<<<<<< HEAD
 	}
 	if isWorkBuddySiteType(item.SiteType) {
 		access, err := s.oauth.EnsureWorkBuddyAccess(ctx, credential.Credential.ID)
 		return access.Token, workBuddySiteConfig(site, access), err
+=======
+>>>>>>> upstream/test
 	}
 	secret := strings.TrimSpace(credential.Secret)
 	if secret == "" {
@@ -105,6 +125,13 @@ func healthProbeOutcome(credentialCount, enabledTested, passed int) (bool, strin
 	default:
 		return true, "", fmt.Sprintf("ok (%d/%d credentials healthy)", passed, enabledTested)
 	}
+}
+
+func accountPoolHealthMessage(siteType, message string) string {
+	if isGrokSiteType(siteType) {
+		return message
+	}
+	return strings.ReplaceAll(message, "grok ", "")
 }
 
 // grokHealthOutcome derives the site-level verdict from per-account results: the

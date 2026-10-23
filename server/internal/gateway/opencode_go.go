@@ -73,7 +73,11 @@ func applyOpenCodeGoDefaultTools(payload map[string]any, candidate routeengine.C
 		tool = map[string]any{
 			"name":         "read",
 			"description":  "读取文件",
+<<<<<<< HEAD
 			"input_schema": parameters,
+=======
+			"input_schema": anthropicToolInputSchema(parameters),
+>>>>>>> upstream/test
 		}
 	default:
 		return

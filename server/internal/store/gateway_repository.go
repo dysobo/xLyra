@@ -164,7 +164,7 @@ func (r GatewayRepository) GetFallbackCredentialForSite(ctx context.Context, sit
 	}
 	candidates := make([]GatewayCredential, 0, len(credentials))
 	for _, credential := range credentials {
-		if !isAPIKeyCredentialType(credential.CredentialType) || !credentialUsable(credential) || credentialCooling(cooldowns, siteID, uuid.Nil, credential.ID) {
+		if !IsAPIKeyCredentialType(credential.CredentialType) || !credentialUsable(credential) || credentialCooling(cooldowns, siteID, uuid.Nil, credential.ID) {
 			continue
 		}
 		state := statesByCredentialID[credential.ID]
@@ -509,6 +509,7 @@ func jsonBoolDefault(data JSON, key string, fallback bool) bool {
 	}
 }
 
+<<<<<<< HEAD
 func isAPIKeyCredentialType(value string) bool {
 	return value == "api_key" || strings.HasPrefix(value, "api_key:")
 }
@@ -517,6 +518,8 @@ func isModelBoundCredentialType(value string) bool {
 	return isAPIKeyCredentialType(value) || strings.HasPrefix(value, "grok_sso:") || strings.HasPrefix(value, "workbuddy_oauth:")
 }
 
+=======
+>>>>>>> upstream/test
 func isNewAPISite(value string) bool {
 	return value == "newapi"
 }

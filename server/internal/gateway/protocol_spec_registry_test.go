@@ -136,7 +136,11 @@ func TestOpenCodeGoProtocolSpecsResolveIndependentPathsAndDefaults(t *testing.T)
 func TestDeepSeekV4MaxTokensDefaultOnlyForAnthropicMessages(t *testing.T) {
 	t.Parallel()
 
+<<<<<<< HEAD
 	for _, siteType := range []string{"deepseek", "workbuddy", "newapi", "openai", "xlyra", "openai-compatible"} {
+=======
+	for _, siteType := range []string{"deepseek", "newapi", "openai", "xlyra", "openai-compatible"} {
+>>>>>>> upstream/test
 		candidate := routeengine.Candidate{
 			Site:  routeengine.CandidateSite{SiteType: siteType},
 			Model: routeengine.CandidateModel{UpstreamName: "deepseek-v4.1-flash"},

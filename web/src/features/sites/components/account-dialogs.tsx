@@ -28,7 +28,11 @@ import { useMobileLayout } from '@/hooks/use-media-query'
 import { cn } from '@/lib/utils'
 
 /**
+<<<<<<< HEAD
  * Shared dialogs for OAuth account sites (Grok, WorkBuddy). They follow the
+=======
+ * Shared dialogs for account sites (Grok and plugin account pools). They follow the
+>>>>>>> upstream/test
  * same presentation as the API key manager of other sites: a centered dialog on
  * desktop (a sheet on mobile) for the list, a nested dialog for the models and
  * a nested dialog for the per-model protocols.
@@ -44,7 +48,11 @@ export function AccountsListDialog({
   children,
 }: {
   open: boolean
+<<<<<<< HEAD
   title: string
+=======
+  title: ReactNode
+>>>>>>> upstream/test
   headerActions?: ReactNode
   /** True while any nested dialog (login, delete, models) is open. */
   nestedOpen: boolean
@@ -121,6 +129,10 @@ export function AccountHeaderActions({
   refreshingAll,
   refreshAllDisabled,
   onRefreshAll,
+<<<<<<< HEAD
+=======
+  showRefreshAll,
+>>>>>>> upstream/test
 }: {
   addLabel: string
   addDisabled?: boolean
@@ -133,6 +145,7 @@ export function AccountHeaderActions({
   refreshingAll?: boolean
   refreshAllDisabled?: boolean
   onRefreshAll: () => void
+<<<<<<< HEAD
 }) {
   const isMobile = useMobileLayout()
   const showImport = Boolean(onImport && importLabel)
@@ -149,6 +162,28 @@ export function AccountHeaderActions({
       >
         {refreshingAll ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
       </Button>
+=======
+  showRefreshAll?: boolean
+}) {
+  const isMobile = useMobileLayout()
+  const showImport = Boolean(onImport && importLabel)
+  const refreshAllVisible = showRefreshAll !== false
+  return (
+    <div className={cn('flex shrink-0 items-center', isMobile ? 'gap-1' : 'gap-2')}>
+      {refreshAllVisible ? (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8"
+          title={refreshAllLabel}
+          aria-label={refreshAllLabel}
+          disabled={refreshingAll || refreshAllDisabled}
+          onClick={onRefreshAll}
+        >
+          {refreshingAll ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+        </Button>
+      ) : null}
+>>>>>>> upstream/test
       {showImport ? (
         isMobile ? (
           <Button size="icon" variant="ghost" className="h-8 w-8" title={importLabel} aria-label={importLabel} disabled={importDisabled} onClick={onImport}>
@@ -156,7 +191,10 @@ export function AccountHeaderActions({
           </Button>
         ) : (
           <Button size="sm" variant="secondary" disabled={importDisabled} onClick={onImport}>
+<<<<<<< HEAD
             <Upload className="h-3.5 w-3.5" />
+=======
+>>>>>>> upstream/test
             {importLabel}
           </Button>
         )
@@ -200,6 +238,11 @@ export function AccountRow({
   modelCountLabel,
   onOpenModels,
   actions,
+<<<<<<< HEAD
+=======
+  showToggle,
+  showModels,
+>>>>>>> upstream/test
 }: {
   name: string
   badges?: ReactNode
@@ -214,7 +257,15 @@ export function AccountRow({
   modelCountLabel: string
   onOpenModels: () => void
   actions: ReactNode
+<<<<<<< HEAD
 }) {
+=======
+  showToggle?: boolean
+  showModels?: boolean
+}) {
+  const toggleVisible = showToggle !== false
+  const modelsVisible = showModels !== false
+>>>>>>> upstream/test
   return (
     <div className="space-y-3 py-4 first:pt-0 last:pb-0">
       <div className="flex items-center justify-between gap-2">
@@ -222,7 +273,11 @@ export function AccountRow({
           <span className="truncate text-body font-medium text-label">{name}</span>
           {badges}
         </div>
+<<<<<<< HEAD
         <Switch checked={enabled} disabled={toggleDisabled} aria-label={toggleLabel} onCheckedChange={onToggle} />
+=======
+        {toggleVisible ? <Switch checked={enabled} disabled={toggleDisabled} aria-label={toggleLabel} onCheckedChange={onToggle} /> : null}
+>>>>>>> upstream/test
       </div>
       {pills ? <div className="flex flex-wrap items-center gap-2 text-footnote text-label-2">{pills}</div> : null}
       {detail ? <div className="rounded-control bg-fill-3 px-3 py-2">{detail}</div> : null}
@@ -230,9 +285,17 @@ export function AccountRow({
       <div className="flex items-center justify-between text-footnote text-label-2">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           {summary}
+<<<<<<< HEAD
           <button type="button" className="cursor-pointer hover:text-label" onClick={onOpenModels}>
             {modelCountLabel}
           </button>
+=======
+          {modelsVisible ? (
+            <button type="button" className="cursor-pointer hover:text-label" onClick={onOpenModels}>
+              {modelCountLabel}
+            </button>
+          ) : null}
+>>>>>>> upstream/test
         </div>
         <div className="flex items-center gap-1">{actions}</div>
       </div>

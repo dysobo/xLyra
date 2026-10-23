@@ -2,16 +2,55 @@ import { apiFetch } from '@/lib/http'
 
 type SiteType = string
 
+/** Plain string, or copy keyed by language (`zh` / `en` / `jp`). Rendered as text. */
+export type AccountUIText = string | Record<string, string>
+
+/** One account-row pill. `field` is a non-secret account field; `labels` optionally renames values. */
+export type AccountRowPill = {
+  field?: string
+  labels?: Record<string, AccountUIText>
+}
+
+/**
+ * Account-pool chrome from the site type. Omitted pieces fall back:
+ * missing `operations` keeps the full button set, missing texts use `accounts.*`.
+ * Operation names match the manifest allowlist: add, reauth, refresh, delete, toggle, models, import.
+ * `refresh` also shows refresh-all. There is no separate refresh-all operation.
+ */
+export type AccountUI = {
+  row_pills?: AccountRowPill[]
+  operations?: string[]
+  texts?: Record<string, AccountUIText>
+}
+
+export type SiteAccountCapabilities = {
+  login_kind: 'oauth2_device_code' | 'custom_poll'
+  supports_import: boolean
+  supports_regions: boolean
+  ui?: AccountUI
+}
+
+export type ProviderStatus = 'enabled' | 'unavailable'
+
 export type SiteTypeInfo = {
   site_type: string
   display_name: string
   subtitle: string
+  display_name_i18n?: Record<string, string>
+  subtitle_i18n?: Record<string, string>
   credential_key: string
+<<<<<<< HEAD
   credential_type: 'api_key' | 'system_token' | 'oauth' | 'xlyra' | 'grok_sso' | 'workbuddy_oauth'
+=======
+  credential_type: 'api_key' | 'system_token' | 'oauth' | 'xlyra' | 'grok_sso' | 'account'
+>>>>>>> upstream/test
   requires_base_url: boolean
   official_base_url?: string
   show_in_create_dialog: boolean
   icon_url?: string
+  accounts?: SiteAccountCapabilities
+  plugin_id?: string
+  provider_status?: ProviderStatus
 }
 
 export type Site = {
@@ -20,6 +59,7 @@ export type Site = {
   slug: string
   site_type: SiteType
   icon_url?: string
+  provider_status?: ProviderStatus
   base_url: string
   status: string
   sync_status?: string | null
@@ -34,7 +74,11 @@ export type Site = {
   meta: Record<string, unknown>
   model_count?: number
   api_key_count?: number
+<<<<<<< HEAD
   // Account-login sites (Grok, WorkBuddy): stored accounts and how many of them are usable.
+=======
+  // Account-login sites (Grok and plugin account pools): stored accounts and how many of them are usable.
+>>>>>>> upstream/test
   account_count?: number
   valid_account_count?: number
   validation?: SiteValidationResult
@@ -92,12 +136,15 @@ export type SiteQuotaProbeEntry = {
   granted_balance?: number
   topped_up_balance?: number
   label: string
+  kind?: 'balance' | 'window' | 'package'
+  name?: string
   unit?: string
   remaining?: number
   limit?: number
   used?: number
   unlimited?: boolean
   reset_at?: string
+  expires_at?: string
 }
 
 export type SiteQuotaProbeResult = {
@@ -393,7 +440,11 @@ export type SiteAPIKeyModel = {
   }
 }
 
+<<<<<<< HEAD
 /** One model of an OAuth account (Grok / WorkBuddy). Mirrors SiteAPIKeyModel's protocol fields. */
+=======
+/** One model of an account (Grok or a plugin account pool). Mirrors SiteAPIKeyModel's protocol fields. */
+>>>>>>> upstream/test
 export type AccountModel = {
   upstream_name: string
   display_name: string
@@ -406,6 +457,7 @@ export type AccountModel = {
     mode?: 'inherit' | 'allowlist' | 'disabled'
     endpoint_types?: string[]
   }
+<<<<<<< HEAD
 }
 
 export type GrokAccountModel = AccountModel
@@ -427,17 +479,24 @@ function accountModelBody(input: AccountModelUpdate) {
     ...(input.endpointMode === undefined ? {} : { endpoint_mode: input.endpointMode }),
     ...(input.endpointTypes === undefined ? {} : { endpoint_types: input.endpointTypes }),
   }
+=======
+>>>>>>> upstream/test
 }
 
-export type GrokAccount = {
+export type GrokAccountModel = AccountModel
+
+export interface AccountBase {
   credential_id: string
   masked_token: string
   enabled: boolean
-  tier?: string | null
   sync_status?: string | null
   sync_message?: string | null
+  model_count?: number
+  models?: AccountModel[]
+  entries?: SiteQuotaProbeEntry[]
   remaining_quota?: number | null
   used_quota?: number | null
+<<<<<<< HEAD
   quota_known?: boolean
   used_percent?: number | null
   remaining_percent?: number | null
@@ -488,8 +547,46 @@ export type GrokAccountsResponse = {
   meta?: {
     count?: number
     failed?: number
+=======
+  quota_limit?: number | null
+  quota_unit?: string
+  /** Upstream region id when the account pool has regions. */
+  region?: string
+  /** Non-secret account fields. Plugin row pills read this first, then a same-named primitive on the account. */
+  fields?: Record<string, string | number | boolean | null>
+}
+
+/** Toggle a model and/or adjust the protocols an account may use for it. */
+export type AccountModelUpdate = {
+  model?: string
+  enabled?: boolean
+  siteModelId?: string
+  endpointMode?: 'inherit' | 'allowlist' | 'disabled'
+  endpointTypes?: string[]
+}
+
+function accountModelBody(input: AccountModelUpdate) {
+  return {
+    ...(input.model === undefined ? {} : { model: input.model }),
+    ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+    ...(input.siteModelId === undefined ? {} : { site_model_id: input.siteModelId }),
+    ...(input.endpointMode === undefined ? {} : { endpoint_mode: input.endpointMode }),
+    ...(input.endpointTypes === undefined ? {} : { endpoint_types: input.endpointTypes }),
+>>>>>>> upstream/test
   }
 }
+
+export interface GrokAccount extends AccountBase {
+  tier?: string | null
+  quota_known?: boolean
+  used_percent?: number | null
+  remaining_percent?: number | null
+  period_type?: string
+  billing_period_end?: string
+  quota_product?: string
+}
+
+export type SiteAccount = GrokAccount
 
 export type SiteModelPricing = {
   id: string
@@ -688,6 +785,10 @@ export const sitesQueryKeys = {
     [...sitesQueryKeys.all, 'detail', siteId] as const,
   models: (siteId: string) =>
     [...sitesQueryKeys.all, 'models', siteId] as const,
+  accounts: (siteId: string) =>
+    [...sitesQueryKeys.detail(siteId), 'accounts'] as const,
+  accountRegions: (siteId: string) =>
+    [...sitesQueryKeys.accounts(siteId), 'regions'] as const,
 }
 
 export type SiteOAuthFilter = 'all' | 'exclude' | 'only'
@@ -1070,17 +1171,77 @@ export async function refreshSiteAPIKey(siteId: string, apiKeyId: string) {
   )
 }
 
-export async function listGrokAccounts(siteId: string) {
-  return apiFetch<GrokAccountsResponse>(`/api/v1/sites/${siteId}/grok/accounts`)
+export type AccountImportItem = {
+  source: string
+  label?: string
+  region?: string
+  status: 'imported' | 'failed'
+  error?: string
+  warning?: string
+  credential_id?: string
 }
 
-export async function updateGrokAccount(
+export type AccountImportResponse = {
+  items: AccountImportItem[]
+  meta: { total: number; imported: number; failed: number }
+}
+
+export type SiteAccountsResponse = {
+  items: SiteAccount[]
+  meta: { count: number }
+}
+
+export type AccountRefreshResult = {
+  credential_id: string
+  account?: SiteAccount
+  error?: string
+}
+
+export type AccountRefreshAllResponse = {
+  items: AccountRefreshResult[]
+  meta: { count: number; failed: number }
+}
+
+export type AccountLoginStart = {
+  kind: SiteAccountCapabilities['login_kind']
+  session: string
+  user_code?: string
+  verification_uri?: string
+  verification_uri_complete?: string
+  auth_url?: string
+  interval: number
+  expires_at: string
+  region?: string
+}
+
+export type AccountLoginPoll = {
+  status: 'pending' | 'slow_down' | 'complete'
+  interval?: number
+  account?: SiteAccount
+}
+
+export type AccountRegion = {
+  id: string
+  label: string
+  label_en: string
+}
+
+export type AccountRegionsResponse = {
+  items: AccountRegion[]
+  meta: { count: number; default: string }
+}
+
+export async function listAccounts(siteId: string) {
+  return apiFetch<SiteAccountsResponse>(`/api/v1/sites/${siteId}/accounts`)
+}
+
+export async function updateAccount(
   siteId: string,
   credentialId: string,
   input: { enabled?: boolean },
 ) {
-  return apiFetch<{ account: GrokAccount }>(
-    `/api/v1/sites/${siteId}/grok/accounts/${credentialId}`,
+  return apiFetch<{ account: SiteAccount }>(
+    `/api/v1/sites/${siteId}/accounts/${credentialId}`,
     {
       method: 'PUT',
       body: { enabled: input.enabled },
@@ -1088,6 +1249,7 @@ export async function updateGrokAccount(
   )
 }
 
+<<<<<<< HEAD
 export async function updateGrokAccountModel(
   siteId: string,
   credentialId: string,
@@ -1103,64 +1265,60 @@ export async function updateGrokAccountModel(
 }
 
 export async function deleteGrokAccount(siteId: string, credentialId: string) {
+=======
+export async function deleteAccount(siteId: string, credentialId: string) {
+>>>>>>> upstream/test
   return apiFetch<void>(
-    `/api/v1/sites/${siteId}/grok/accounts/${credentialId}`,
+    `/api/v1/sites/${siteId}/accounts/${credentialId}`,
     {
       method: 'DELETE',
     },
   )
 }
 
-export async function refreshGrokAccount(siteId: string, credentialId: string) {
-  return apiFetch<{ account: GrokAccount }>(
-    `/api/v1/sites/${siteId}/grok/accounts/${credentialId}/refresh`,
+export async function refreshAccount(siteId: string, credentialId: string) {
+  return apiFetch<{ account: SiteAccount }>(
+    `/api/v1/sites/${siteId}/accounts/${credentialId}/refresh`,
     {
       method: 'POST',
     },
   )
 }
 
-export async function refreshGrokAccounts(siteId: string) {
-  return apiFetch<GrokAccountsResponse>(
-    `/api/v1/sites/${siteId}/grok/accounts/refresh`,
+export async function refreshAccounts(siteId: string) {
+  return apiFetch<AccountRefreshAllResponse>(
+    `/api/v1/sites/${siteId}/accounts/refresh`,
     {
       method: 'POST',
     },
   )
 }
 
-export type GrokDeviceStart = {
-  device_code: string
-  user_code: string
-  verification_uri: string
-  verification_uri_complete: string
-  interval: number
-  expires_at: string
-}
-
-export type GrokDevicePollResult =
-  | { status: 'pending' | 'slow_down' }
-  | { status: 'complete'; account: GrokAccount }
-
-export async function startGrokDeviceLogin(siteId: string) {
-  return apiFetch<{ device: GrokDeviceStart }>(
-    `/api/v1/sites/${siteId}/grok/device/start`,
+export async function updateAccountModel(
+  siteId: string,
+  credentialId: string,
+  input: AccountModelUpdate,
+) {
+  return apiFetch<{ account: SiteAccount }>(
+    `/api/v1/sites/${siteId}/accounts/${credentialId}/models`,
     {
-      method: 'POST',
+      method: 'PUT',
+      body: accountModelBody(input),
     },
   )
 }
 
-export async function pollGrokDeviceLogin(siteId: string, deviceCode: string, credentialId?: string) {
-  return apiFetch<{ device: GrokDevicePollResult }>(
-    `/api/v1/sites/${siteId}/grok/device/poll`,
+export async function startAccountLogin(siteId: string, region?: string) {
+  return apiFetch<{ login: AccountLoginStart }>(
+    `/api/v1/sites/${siteId}/accounts/login/start`,
     {
       method: 'POST',
-      body: { device_code: deviceCode, ...(credentialId ? { credential_id: credentialId } : {}) },
+      body: region ? { region } : {},
     },
   )
 }
 
+<<<<<<< HEAD
 export async function listWorkBuddyAccounts(siteId: string) {
   return apiFetch<WorkBuddyAccountsResponse>(`/api/v1/sites/${siteId}/workbuddy/accounts`)
 }
@@ -1207,10 +1365,19 @@ export async function refreshWorkBuddyAccount(siteId: string, credentialId: stri
     `/api/v1/sites/${siteId}/workbuddy/accounts/${credentialId}/refresh`,
     {
       method: 'POST',
+=======
+export async function pollAccountLogin(siteId: string, session: string, credentialId?: string) {
+  return apiFetch<{ login: AccountLoginPoll }>(
+    `/api/v1/sites/${siteId}/accounts/login/poll`,
+    {
+      method: 'POST',
+      body: { session, ...(credentialId ? { credential_id: credentialId } : {}) },
+>>>>>>> upstream/test
     },
   )
 }
 
+<<<<<<< HEAD
 export async function refreshWorkBuddyAccounts(siteId: string) {
   return apiFetch<WorkBuddyAccountsResponse>(
     `/api/v1/sites/${siteId}/workbuddy/accounts/refresh`,
@@ -1278,6 +1445,11 @@ export type WorkBuddyImportResponse = {
 export async function importWorkBuddyAccounts(siteId: string, files: { name: string; content: string }[]) {
   return apiFetch<WorkBuddyImportResponse>(
     `/api/v1/sites/${siteId}/workbuddy/accounts/import`,
+=======
+export async function importAccounts(siteId: string, files: { name: string; content: string }[]) {
+  return apiFetch<AccountImportResponse>(
+    `/api/v1/sites/${siteId}/accounts/import`,
+>>>>>>> upstream/test
     {
       method: 'POST',
       body: { files },
@@ -1285,6 +1457,7 @@ export async function importWorkBuddyAccounts(siteId: string, files: { name: str
   )
 }
 
+<<<<<<< HEAD
 export async function pollWorkBuddyLogin(siteId: string, state: string, credentialId?: string) {
   return apiFetch<{ login: WorkBuddyLoginPollResult }>(
     `/api/v1/sites/${siteId}/workbuddy/login/poll`,
@@ -1293,4 +1466,8 @@ export async function pollWorkBuddyLogin(siteId: string, state: string, credenti
       body: { state, ...(credentialId ? { credential_id: credentialId } : {}) },
     },
   )
+=======
+export async function listAccountRegions(siteId: string) {
+  return apiFetch<AccountRegionsResponse>(`/api/v1/sites/${siteId}/accounts/regions`)
+>>>>>>> upstream/test
 }

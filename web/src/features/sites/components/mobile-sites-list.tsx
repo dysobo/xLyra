@@ -7,7 +7,9 @@ import { cn } from '@/lib/utils'
 import { SiteBalanceDetailsContent } from '@/features/sites/components/site-balance-cell'
 import { SiteHealthBadge } from '@/features/sites/components/site-health-badge'
 import { SitePlanBadge } from '@/features/sites/components/site-plan-badge'
+import { ProviderUnavailableBadge } from '@/features/sites/components/provider-unavailable-badge'
 import { SiteTypeBadge } from '@/features/sites/components/site-type-badge'
+import { SiteTypeIcon } from '@/features/sites/components/site-type-icon'
 import type { Site, SiteAPIKey, SiteModel, SiteTypeInfo } from '@/features/sites/api/sites'
 import {
   formatCompactTokens,
@@ -52,7 +54,7 @@ export function MobileSitesList({
   onDelete,
   onOpenModels,
   onOpenAPIKeys,
-  onOpenGrokAccounts,
+  onOpenAccounts,
   onOpenTest,
   onOpenUsageSplit,
   siteTypes,
@@ -77,7 +79,7 @@ export function MobileSitesList({
   onDelete: (site: Site) => void
   onOpenModels: (site: Site) => void
   onOpenAPIKeys: (site: Site) => void
-  onOpenGrokAccounts: (site: Site) => void
+  onOpenAccounts: (site: Site) => void
   onOpenTest: (site: Site) => void
   onOpenUsageSplit: (site: Site) => void
   siteTypes: SiteTypeInfo[]
@@ -114,7 +116,7 @@ export function MobileSitesList({
             onDelete={onDelete}
             onOpenModels={onOpenModels}
             onOpenAPIKeys={onOpenAPIKeys}
-            onOpenGrokAccounts={onOpenGrokAccounts}
+            onOpenAccounts={onOpenAccounts}
             onOpenTest={onOpenTest}
             onOpenUsageSplit={onOpenUsageSplit}
             siteTypes={siteTypes}
@@ -150,7 +152,7 @@ function MobileSiteCard({
   onDelete,
   onOpenModels,
   onOpenAPIKeys,
-  onOpenGrokAccounts,
+  onOpenAccounts,
   onOpenTest,
   onOpenUsageSplit,
   siteTypes,
@@ -171,7 +173,7 @@ function MobileSiteCard({
   onDelete: (site: Site) => void
   onOpenModels: (site: Site) => void
   onOpenAPIKeys: (site: Site) => void
-  onOpenGrokAccounts: (site: Site) => void
+  onOpenAccounts: (site: Site) => void
   onOpenTest: (site: Site) => void
   onOpenUsageSplit: (site: Site) => void
   siteTypes: SiteTypeInfo[]
@@ -180,7 +182,11 @@ function MobileSiteCard({
   const oauth = isOAuthSite(site)
   const icon = siteTypeIcon(site.site_type, siteTypes) || site.icon_url
   const modelCount = siteModelsDisplayCount(site, models, apiKeys)
+<<<<<<< HEAD
   const isGrok = isAccountLoginSiteType(site.site_type)
+=======
+  const isGrok = isAccountLoginSiteType(site.site_type, siteTypes)
+>>>>>>> upstream/test
   const keyInfo = oauth || isGrok ? null : { enabled: apiKeys.filter((key) => key.enabled).length, total: apiKeys.length || site.api_key_count || 0 }
   const usage = site.usage
   const totalTokens = usage?.total_tokens ?? 0
@@ -198,11 +204,21 @@ function MobileSiteCard({
     // 站点卡片：名字独占标题行，标签放到下一行可换行，名字不再被挤成「h…」
     <ItemCard>
       <CardHeading
-        leading={icon ? <img src={icon} alt="" className={cn('mt-0.5 size-8 shrink-0 rounded-inner object-contain', siteTypeIconClassName(site.site_type))} /> : null}
+        leading={(
+          <SiteTypeIcon
+            src={icon}
+            name={site.name}
+            empty="hidden"
+            muted={site.provider_status === 'unavailable'}
+            className="mt-0.5 size-8 shrink-0 rounded-inner"
+            imageClassName={siteTypeIconClassName(site.site_type)}
+          />
+        )}
         title={site.name}
         tags={(
           <>
             <SiteTypeBadge siteType={site.site_type} siteTypes={siteTypes} />
+            <ProviderUnavailableBadge status={site.provider_status} />
             <SitePlanBadge site={site} />
             {statusBadge}
           </>
@@ -243,7 +259,11 @@ function MobileSiteCard({
           <CardMetric
             label={t('table.headers.accounts')}
             value={t('table.resources.accounts', siteAccountCounts(site))}
+<<<<<<< HEAD
             onClick={() => onOpenGrokAccounts(site)}
+=======
+            onClick={() => onOpenAccounts(site)}
+>>>>>>> upstream/test
           />
         ) : keyInfo ? (
           <CardMetric

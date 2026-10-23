@@ -5,8 +5,12 @@ import type { JsonFileItem } from '@/components/common/use-json-files'
 
 /**
  * Shared JSON file drop zone: drag & drop, click to choose and paste, plus the
+<<<<<<< HEAD
  * list of the chosen files. Used by the account import dialogs (OAuth accounts,
  * WorkBuddy accounts).
+=======
+ * list of the chosen files. Used by the account import dialog.
+>>>>>>> upstream/test
  */
 
 export const JSON_DROP_AREA_CLASS = 'h-[156px] min-h-[156px]'
