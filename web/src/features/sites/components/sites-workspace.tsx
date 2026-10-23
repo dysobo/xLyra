@@ -43,6 +43,7 @@ import {
   updateSiteEnabled,
   type Site,
   type SiteAPIKey,
+  type SiteAccountCapabilities,
   type SiteModel,
   type SiteTypeInfo,
 } from '@/features/sites/api/sites'
@@ -63,8 +64,7 @@ import { fetchSystemProxyConfig } from '@/features/settings/api/settings'
 import { ChannelSplitDialog } from '@/features/usage/components/channel-split-dialog'
 import type { ChannelSplitTarget } from '@/features/usage/api/channel-split'
 import { SiteAPIKeysDraw } from '@/features/sites/components/site-api-keys-draw'
-import { GrokAccountsDraw } from '@/features/sites/components/grok-accounts-draw'
-import { WorkBuddyAccountsDraw } from '@/features/sites/components/workbuddy-accounts-draw'
+import { AccountProviderDraw } from '@/features/sites/components/account-provider-draw'
 import {
   SiteCreateDialog,
   type SiteCreateSubmitInput,
@@ -73,6 +73,7 @@ import { SiteCreateSheet } from '@/features/sites/components/site-create-sheet'
 import { SiteModelTestSheet } from '@/features/sites/components/site-model-test-sheet'
 import { SiteModelsDraw } from '@/features/sites/components/site-models-draw'
 import { MobileSitesList } from '@/features/sites/components/mobile-sites-list'
+import { SiteTypeIcon } from '@/features/sites/components/site-type-icon'
 import { SitesTable } from '@/features/sites/components/sites-table'
 import {
   mergeListSite,
@@ -122,13 +123,30 @@ function siteURLTarget(params: URLSearchParams) {
   }
 }
 
+function accountCapabilities(site: Site | null, siteTypes: readonly SiteTypeInfo[]): SiteAccountCapabilities | null {
+  if (!site) return null
+  const listed = siteTypes.find((item) => item.site_type.trim().toLowerCase() === site.site_type.trim().toLowerCase())
+  if (listed) return listed.accounts ?? null
+  if (site.site_type === 'grok') {
+    return { login_kind: 'oauth2_device_code', supports_import: false, supports_regions: false }
+  }
+  return null
+}
+
+function opensAccountDrawer(site: Site, panel: string, siteTypes: readonly SiteTypeInfo[]) {
+  if (!isAccountLoginSiteType(site.site_type, siteTypes)) return false
+  if (panel === 'accounts' || panel === 'api_keys') return true
+  if (panel === 'grok_accounts') return site.site_type === 'grok'
+  return false
+}
+
 export function SitesWorkspace({
   initialSearch = '',
 }: {
   initialSearch?: string
 }) {
   const queryClient = useQueryClient()
-  const { t } = useTranslation('sites')
+  const { t, i18n } = useTranslation('sites')
   const isMobile = useMobileLayout()
   const [initialURLTarget] = useState(() =>
     siteURLTarget(new URLSearchParams(initialSearch)),
@@ -143,8 +161,7 @@ export function SitesWorkspace({
   const [modelsSite, setModelsSite] = useState<Site | null>(null)
   const [testSite, setTestSite] = useState<Site | null>(null)
   const [apiKeysSite, setAPIKeysSite] = useState<Site | null>(null)
-  const [grokAccountsSite, setGrokAccountsSite] = useState<Site | null>(null)
-  const [workBuddyAccountsSite, setWorkBuddyAccountsSite] = useState<Site | null>(null)
+  const [accountsSite, setAccountsSite] = useState<Site | null>(null)
   const [usageSplitTarget, setUsageSplitTarget] =
     useState<ChannelSplitTarget | null>(null)
   const [urlAPIKeysOpen, setURLAPIKeysOpen] = useState(true)
@@ -234,8 +251,8 @@ export function SitesWorkspace({
     })),
   })
   const sitesWithAPIKeys = useMemo(
-    () => sites.filter((site) => !isOAuthSite(site) && !isAccountLoginSiteType(site.site_type)),
-    [sites],
+    () => sites.filter((site) => !isOAuthSite(site) && !isAccountLoginSiteType(site.site_type, siteTypesQuery.data?.items)),
+    [sites, siteTypesQuery.data?.items],
   )
   const siteAPIKeyQueries = useQueries({
     queries: sitesWithAPIKeys.map((site) => ({
@@ -386,19 +403,20 @@ export function SitesWorkspace({
 
   const filterTabs = useMemo(() => {
     const seen = new Set<string>()
-    const tabs: { value: string; label: string; icon: string | null }[] = []
+    const tabs: { value: string; label: string; icon: string | null; muted: boolean }[] = []
     for (const site of sites) {
       const key = normalizedSiteTypeFilter(site.site_type)
       if (seen.has(key)) continue
       seen.add(key)
       tabs.push({
         value: key,
-        label: formatSiteTypeLabel(site.site_type, siteTypes),
-        icon: siteTypeIcon(site.site_type, siteTypes),
+        label: formatSiteTypeLabel(site.site_type, siteTypes, i18n.language),
+        icon: siteTypeIcon(site.site_type, siteTypes) || site.icon_url || null,
+        muted: site.provider_status === 'unavailable',
       })
     }
     return tabs
-  }, [siteTypes, sites])
+  }, [i18n.language, siteTypes, sites])
 
   const filteredSites = useMemo(() => {
     const keyword = effectiveSearch.trim().toLowerCase()
@@ -583,10 +601,7 @@ export function SitesWorkspace({
         queryKey: [...sitesQueryKeys.detail(result.site.id), 'api-keys'],
       })
       await queryClient.invalidateQueries({
-        queryKey: [...sitesQueryKeys.detail(result.site.id), 'grok-accounts'],
-      })
-      await queryClient.invalidateQueries({
-        queryKey: [...sitesQueryKeys.detail(result.site.id), 'workbuddy-accounts'],
+        queryKey: sitesQueryKeys.accounts(result.site.id),
       })
       await queryClient.invalidateQueries({
         queryKey: sitesQueryKeys.models(result.site.id),
@@ -826,11 +841,7 @@ export function SitesWorkspace({
     onDelete: (site: Site) => setDeleteTargetSite(site),
     onOpenModels: setModelsSite,
     onOpenAPIKeys: setAPIKeysSite,
-    // Account-login sites share one entry point; dispatch to the matching drawer.
-    onOpenGrokAccounts: (site: Site) =>
-      site.site_type === 'workbuddy'
-        ? setWorkBuddyAccountsSite(site)
-        : setGrokAccountsSite(site),
+    onOpenAccounts: setAccountsSite,
     onOpenTest: setTestSite,
     onOpenUsageSplit: (site: Site) =>
       setUsageSplitTarget({ type: 'site', id: site.id }),
@@ -862,13 +873,13 @@ export function SitesWorkspace({
             <TabsTrigger key={tab.value} value={tab.value}>
               <span className="flex items-center gap-1.5">
                 {tab.icon ? (
-                  <img
+                  <SiteTypeIcon
                     src={tab.icon}
-                    alt=""
-                    className={cn(
-                      'h-4 w-4 rounded object-contain',
-                      siteTypeIconClassName(tab.value),
-                    )}
+                    name={tab.label}
+                    empty="hidden"
+                    muted={tab.muted}
+                    className="h-4 w-4 shrink-0 rounded"
+                    imageClassName={siteTypeIconClassName(tab.value)}
                   />
                 ) : null}
                 {tab.label}
@@ -1067,6 +1078,11 @@ export function SitesWorkspace({
     },
   }
 
+  const urlAccountsSite = urlAPIKeysOpen && urlTargetSite && opensAccountDrawer(urlTargetSite, initialURLTarget.panel, siteTypes)
+    ? urlTargetSite
+    : null
+  const activeAccountsSite = accountsSite ?? urlAccountsSite
+
   return (
     <div className={isMobile ? 'min-h-full' : 'h-full min-h-0 overflow-hidden'}>
       {layout}
@@ -1110,7 +1126,7 @@ export function SitesWorkspace({
           apiKeysSite ??
           (urlAPIKeysOpen &&
           initialURLTarget.panel === 'api_keys' &&
-          !isAccountLoginSiteType(urlTargetSite?.site_type)
+          !isAccountLoginSiteType(urlTargetSite?.site_type, siteTypes)
             ? urlTargetSite
             : null)
         }
@@ -1122,35 +1138,15 @@ export function SitesWorkspace({
         }}
       />
 
-      <GrokAccountsDraw
-        site={
-          grokAccountsSite ??
-          (urlAPIKeysOpen &&
-          urlTargetSite?.site_type === 'grok' &&
-          ['api_keys', 'grok_accounts'].includes(initialURLTarget.panel)
-            ? urlTargetSite
-            : null)
-        }
+      <AccountProviderDraw
+        key={activeAccountsSite?.id ?? 'accounts'}
+        site={activeAccountsSite}
+        capabilities={accountCapabilities(activeAccountsSite, siteTypes)}
+        iconURL={activeAccountsSite ? siteTypeIcon(activeAccountsSite.site_type, siteTypes) || activeAccountsSite.icon_url || null : null}
+        typeLabel={activeAccountsSite ? formatSiteTypeLabel(activeAccountsSite.site_type, siteTypes, i18n.language) : null}
         onOpenChange={(open) => {
           if (!open) {
-            setGrokAccountsSite(null)
-            setURLAPIKeysOpen(false)
-          }
-        }}
-      />
-
-      <WorkBuddyAccountsDraw
-        site={
-          workBuddyAccountsSite ??
-          (urlAPIKeysOpen &&
-          urlTargetSite?.site_type === 'workbuddy' &&
-          ['api_keys', 'workbuddy_accounts'].includes(initialURLTarget.panel)
-            ? urlTargetSite
-            : null)
-        }
-        onOpenChange={(open) => {
-          if (!open) {
-            setWorkBuddyAccountsSite(null)
+            setAccountsSite(null)
             setURLAPIKeysOpen(false)
           }
         }}

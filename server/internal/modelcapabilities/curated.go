@@ -140,7 +140,7 @@ func normalizeImageModelID(value string) string {
 
 func UsesModelNameEndpointInference(siteType string) bool {
 	siteType = normalizeModelID(siteType)
-	if siteType == "" {
+	if siteType == "" || strings.Contains(siteType, "/") {
 		return false
 	}
 	switch siteType {
@@ -148,7 +148,7 @@ func UsesModelNameEndpointInference(siteType string) bool {
 		"opencode_go",
 		"deepseek", "minimax", "xiaomi_mimo", "moonshot", "kimi_code",
 		"google", "google_gemini", "zhipu", "glm_code",
-		"typesafe", "workbuddy":
+		"typesafe":
 		return false
 	default:
 		return true

@@ -99,12 +99,15 @@
     "updatedAtMode": {
       "showAbsolute": "Switch to absolute time",
       "showRelative": "Switch to relative time"
-    }
+    },
+    "providerUnavailable": "Provider plugin disabled",
+    "providerUnavailableHint": "This site type comes from a plugin that is disabled or uninstalled. Site data is kept, but the site is not routed."
   },
   "form": {
     "createTitle": "Add Site",
     "backToProviders": "Back to providers",
     "editTitle": "Edit Site",
+    "pluginTag": "Plugin",
     "sections": {
       "basic": "Basic Info",
       "connection": "Connection",
@@ -194,8 +197,7 @@
       "glm_code": "Connect with a GLM Coding Plan API key",
       "newapi": "Use a system token for a self-hosted or third-party panel",
       "xlyra": "Connect an xLyra gateway with an access token or one downstream API key",
-      "grok": "Connect Grok via xAI account device authorization (multi-account)",
-      "workbuddy": "Connect WorkBuddy (CodeBuddy) accounts via browser login (multi-account)"
+      "grok": "Connect Grok via xAI account device authorization (multi-account)"
     },
     "validation": {
       "nameRequired": "Please enter a site name",
@@ -222,7 +224,7 @@
       "removeHeader": "Remove Header"
     },
     "grokDeviceHint": "Grok accounts are added after the site is created — open the site's account panel and sign in with the xAI device flow.",
-    "workbuddyLoginHint": "WorkBuddy accounts are added after the site is created — open the site's account panel and sign in to WorkBuddy in your browser."
+    "accountLoginHint": "Accounts are added after the site is created — open the site's account panel and finish signing in."
   },
   "apiKeys": {
     "title": "API Key",
@@ -316,6 +318,75 @@
       "empty": "This model has no configurable protocols"
     }
   },
+  "accounts": {
+    "title": "Accounts",
+    "add": "Add account",
+    "import": "Import accounts",
+    "loading": "Loading accounts",
+    "empty": "No accounts",
+    "unnamed": "Account",
+    "refresh": "Refresh account",
+    "refreshAll": "Refresh all",
+    "reauthorize": "Reauthorize account",
+    "delete": "Delete account",
+    "toggleLabel": "Toggle {{name}}",
+    "cancel": "Cancel",
+    "toast": {
+      "created": "Account created",
+      "updateFailed": "Failed to update account",
+      "updated": "Account updated",
+      "deleteFailed": "Failed to delete account",
+      "deleted": "Account deleted",
+      "refreshed": "Account refreshed",
+      "refreshFailed": "Failed to refresh account",
+      "refreshedAll": "All accounts refreshed",
+      "refreshAllPartial": "Some accounts failed to refresh",
+      "refreshAllPartialDesc": "{{count}} account(s) failed to refresh",
+      "refreshAllFailed": "Failed to refresh accounts"
+    },
+    "deleteDialog": {
+      "title": "Delete account",
+      "confirm": "Delete {{name}}? Its status, quota, and model associations will also be removed.",
+      "delete": "Delete"
+    },
+    "login": {
+      "title": "Add account",
+      "reauthTitle": "Reauthorize account",
+      "starting": "Preparing sign-in…",
+      "instructions": "Finish authorization in the page that opened. If it did not open, use the button below.",
+      "authorize": "Open authorization page",
+      "waiting": "Waiting for approval…"
+    },
+    "sync": {
+      "synced": "Synced",
+      "failed": "Failed",
+      "reauthRequired": "Reauthorization required",
+      "stale": "Using last synced models",
+      "partial": "Partial",
+      "unknown": "Not synced"
+    },
+    "regionDialog": {
+      "title": "Choose a region",
+      "description": "Choose the account region. Sign-in continues at that region's address.",
+      "continue": "Continue"
+    },
+    "importDialog": {
+      "title": "Import accounts",
+      "dropzone": "Drop JSON files here, or click to choose",
+      "hint": "Upload account JSON for this site type. The server parses it.",
+      "selectedCount": "{{count}} file(s) selected",
+      "import": "Import",
+      "importWithCount": "Import {{count}} file(s)",
+      "cancel": "Cancel",
+      "done": "Done",
+      "summary": "{{total}} accounts, {{imported}} imported, {{failed}} failed",
+      "imported": "Imported",
+      "failed": "Failed",
+      "unnamed": "Unnamed account",
+      "toastDone": "Account import finished",
+      "toastFailed": "Account import failed"
+    }
+  },
   "grokAccounts": {
     "title": "Grok Accounts",
     "add": "Add account",
@@ -355,10 +426,6 @@
       "authorize": "Open authorization page",
       "waiting": "Waiting for approval…"
     },
-    "quota": {
-      "allowance": "Plan allowance",
-      "resetsOn": "resets {{date}}"
-    },
     "sync": {
       "synced": "Synced",
       "failed": "Failed",
@@ -368,90 +435,7 @@
       "unknown": "Not synced"
     }
   },
-  "workbuddyAccounts": {
-    "title": "WorkBuddy Accounts",
-    "add": "Add account",
-    "import": "Import accounts",
-    "loading": "Loading accounts",
-    "empty": "No WorkBuddy accounts",
-    "unnamed": "WorkBuddy account",
-    "models": "Models",
-    "refresh": "Refresh account",
-    "refreshAll": "Refresh all",
-    "reauthorize": "Reauthorize account",
-    "delete": "Delete account",
-    "toggleLabel": "Toggle {{name}}",
-    "cancel": "Cancel",
-    "toast": {
-      "created": "Account created",
-      "updateFailed": "Failed to update account",
-      "updated": "Account updated",
-      "deleteFailed": "Failed to delete account",
-      "deleted": "Account deleted",
-      "refreshed": "Account refreshed",
-      "refreshFailed": "Failed to refresh account",
-      "refreshedAll": "All accounts refreshed",
-      "refreshAllPartial": "Some accounts failed to refresh",
-      "refreshAllPartialDesc": "{{count}} account(s) failed to refresh",
-      "refreshAllFailed": "Failed to refresh accounts"
-    },
-    "deleteDialog": {
-      "title": "Delete WorkBuddy account",
-      "confirm": "Delete {{name}}? Its status, quota, and model associations will also be removed.",
-      "delete": "Delete"
-    },
-    "login": {
-      "title": "Add WorkBuddy account",
-      "reauthTitle": "Reauthorize WorkBuddy account",
-      "starting": "Requesting login link…",
-      "instructions": "Sign in and approve access on the WorkBuddy page that just opened; this dialog continues automatically. If nothing opened, use the button below:",
-      "authorize": "Open login page",
-      "waiting": "Waiting for login…"
-    },
-    "quota": {
-      "credits": "Credits",
-      "resetsOn": "resets {{date}}",
-      "expiresOn": "expires {{date}}",
-      "unknown": "Quota not synced yet — refresh the account"
-    },
-    "sync": {
-      "synced": "Synced",
-      "failed": "Failed",
-      "reauthRequired": "Reauthorization required",
-      "stale": "Using last synced models",
-      "partial": "Partial",
-      "unknown": "Not synced"
-    },
-    "region": {
-      "cn": "China site",
-      "intl": "International site"
-    },
-    "regionDialog": {
-      "title": "Choose a login site",
-      "description": "Pick the WorkBuddy site your account belongs to. You will be sent to that site to log in.",
-      "cn": "China site",
-      "cnHint": "For mainland accounts, logs in on the Tencent Cloud China site",
-      "intl": "International site",
-      "intlHint": "For overseas accounts, logs in on the CodeBuddy international site",
-      "continue": "Continue to login"
-    },
-    "importDialog": {
-      "title": "Import WorkBuddy accounts",
-      "dropzone": "Drop JSON files here, or click to choose",
-      "hint": "Exported WorkBuddy account JSON. The China or international site is detected from realm and domain in the file",
-      "selectedCount": "{{count}} files selected",
-      "import": "Import",
-      "importWithCount": "Import {{count}} files",
-      "cancel": "Cancel",
-      "done": "Done",
-      "summary": "{{total}} accounts: {{imported}} imported, {{failed}} failed",
-      "imported": "Imported",
-      "failed": "Failed",
-      "unnamed": "Unnamed account",
-      "toastDone": "Account import finished",
-      "toastFailed": "Account import failed"
-    }
-  },
+
   "test": {
     "title": "{{name}} Model Test",
     "headers": {
@@ -531,6 +515,15 @@
       "deleteFailed": "Model deletion failed",
       "deleteSuccess": "Model deleted"
     }
+  },
+
+  "quotaEntries": {
+    "allowance": "Plan allowance",
+    "credits": "Credits",
+    "balance": "Balance",
+    "resetsOn": "resets {{date}}",
+    "expiresOn": "expires {{date}}",
+    "unknown": "Quota not synced yet — refresh the account"
   },
   "utils": {
     "justNow": "just now"

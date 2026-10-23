@@ -99,12 +99,15 @@
     "updatedAtMode": {
       "showAbsolute": "絶対時刻に切り替え",
       "showRelative": "相対時刻に切り替え"
-    }
+    },
+    "providerUnavailable": "プロバイダープラグインが無効",
+    "providerUnavailableHint": "このサイトタイプはプラグインが提供しています。プラグインは停止または削除済みです。サイトデータは残りますが、ルーティングには参加しません"
   },
   "form": {
     "createTitle": "サイトを追加",
     "backToProviders": "プロバイダー一覧へ戻る",
     "editTitle": "サイトを編集",
+    "pluginTag": "プラグイン",
     "sections": {
       "basic": "基本情報",
       "connection": "接続",
@@ -186,8 +189,7 @@
       "glm_code": "GLM Coding Plan API キーで接続",
       "newapi": "自ホストまたはサードパーティパネルにはシステムトークンを使用",
       "xlyra": "アクセストークンまたは単一の下流 API キーで xLyra ゲートウェイに接続",
-      "grok": "xAI アカウントのデバイス認証で Grok に接続（複数アカウント対応）",
-      "workbuddy": "WorkBuddy（CodeBuddy）アカウントをブラウザログインで接続（複数アカウント対応）"
+      "grok": "xAI アカウントのデバイス認証で Grok に接続（複数アカウント対応）"
     },
     "validation": {
       "nameRequired": "サイト名を入力してください",
@@ -213,7 +215,7 @@
       "removeHeader": "ヘッダーを削除"
     },
     "grokDeviceHint": "Grok アカウントはサイト作成後に追加します。サイトのアカウントパネルを開き、xAI デバイス認証でログインしてください。",
-    "workbuddyLoginHint": "WorkBuddy アカウントはサイト作成後に追加します。サイトのアカウントパネルを開き、ブラウザで WorkBuddy にログインしてください。"
+    "accountLoginHint": "アカウントはサイト作成後に追加します。サイトのアカウントパネルを開き、画面の案内に従ってログインしてください。"
   },
   "apiKeys": {
     "title": "API キー",
@@ -307,6 +309,75 @@
       "empty": "設定可能なプロトコルがありません"
     }
   },
+  "accounts": {
+    "title": "アカウント",
+    "add": "アカウントを追加",
+    "import": "アカウントをインポート",
+    "loading": "アカウントを読み込み中",
+    "empty": "アカウントがありません",
+    "unnamed": "アカウント",
+    "refresh": "アカウントを更新",
+    "refreshAll": "すべて更新",
+    "reauthorize": "アカウントを再認可",
+    "delete": "アカウントを削除",
+    "toggleLabel": "{{name}} を切り替え",
+    "cancel": "キャンセル",
+    "toast": {
+      "created": "アカウントを作成しました",
+      "updateFailed": "アカウントの更新に失敗しました",
+      "updated": "アカウントを更新しました",
+      "deleteFailed": "アカウントの削除に失敗しました",
+      "deleted": "アカウントを削除しました",
+      "refreshed": "アカウントを更新しました",
+      "refreshFailed": "アカウントの更新に失敗しました",
+      "refreshedAll": "すべてのアカウントを更新しました",
+      "refreshAllPartial": "一部のアカウントを更新できませんでした",
+      "refreshAllPartialDesc": "{{count}} 件のアカウントを更新できませんでした",
+      "refreshAllFailed": "アカウントの一括更新に失敗しました"
+    },
+    "deleteDialog": {
+      "title": "アカウントを削除",
+      "confirm": "「{{name}}」を削除しますか？状態、利用枠、モデルの関連も削除されます。",
+      "delete": "削除する"
+    },
+    "login": {
+      "title": "アカウントを追加",
+      "reauthTitle": "アカウントを再認可",
+      "starting": "ログインを準備しています…",
+      "instructions": "開いたページで認可を完了してください。ページが開かない場合は下のボタンを押してください。",
+      "authorize": "認可ページを開く",
+      "waiting": "認可を待っています…"
+    },
+    "sync": {
+      "synced": "同期済み",
+      "failed": "失敗",
+      "reauthRequired": "再認可が必要",
+      "stale": "前回同期したモデルを使用",
+      "partial": "一部",
+      "unknown": "未同期"
+    },
+    "regionDialog": {
+      "title": "リージョンを選択",
+      "description": "アカウントのリージョンを選ぶと、そのアドレスでログインを続けます。",
+      "continue": "ログインを続ける"
+    },
+    "importDialog": {
+      "title": "アカウントをインポート",
+      "dropzone": "JSON ファイルをここにドロップするか、クリックして選択",
+      "hint": "このサイトタイプのアカウント JSON をアップロードします。解析はサーバーが行います。",
+      "selectedCount": "{{count}} 件のファイルを選択",
+      "import": "インポート",
+      "importWithCount": "{{count}} 件のファイルをインポート",
+      "cancel": "キャンセル",
+      "done": "完了",
+      "summary": "合計 {{total}} 件、成功 {{imported}} 件、失敗 {{failed}} 件",
+      "imported": "インポート済み",
+      "failed": "失敗",
+      "unnamed": "名前のないアカウント",
+      "toastDone": "アカウントのインポートが完了しました",
+      "toastFailed": "アカウントのインポートに失敗しました"
+    }
+  },
   "grokAccounts": {
     "title": "Grok アカウント",
     "add": "アカウントを追加",
@@ -346,10 +417,6 @@
       "authorize": "認証ページを開く",
       "waiting": "承認を待っています…"
     },
-    "quota": {
-      "allowance": "プラン枠",
-      "resetsOn": "{{date}} にリセット"
-    },
     "sync": {
       "synced": "同期済み",
       "failed": "失敗",
@@ -359,90 +426,7 @@
       "unknown": "未同期"
     }
   },
-  "workbuddyAccounts": {
-    "title": "WorkBuddy アカウント",
-    "add": "アカウントを追加",
-    "import": "アカウントをインポート",
-    "loading": "アカウントを読み込み中",
-    "empty": "WorkBuddy アカウントはありません",
-    "unnamed": "WorkBuddy アカウント",
-    "models": "モデル",
-    "refresh": "アカウントを更新",
-    "refreshAll": "すべて更新",
-    "reauthorize": "アカウントを再認証",
-    "delete": "アカウントを削除",
-    "toggleLabel": "{{name}} を切り替え",
-    "cancel": "キャンセル",
-    "toast": {
-      "created": "アカウントを作成しました",
-      "updateFailed": "アカウントの更新に失敗しました",
-      "updated": "アカウントを更新しました",
-      "deleteFailed": "アカウントの削除に失敗しました",
-      "deleted": "アカウントを削除しました",
-      "refreshed": "アカウントを更新しました",
-      "refreshFailed": "アカウントの更新に失敗しました",
-      "refreshedAll": "すべてのアカウントを更新しました",
-      "refreshAllPartial": "一部のアカウントの更新に失敗しました",
-      "refreshAllPartialDesc": "{{count}} 件のアカウントの更新に失敗しました",
-      "refreshAllFailed": "アカウントの一括更新に失敗しました"
-    },
-    "deleteDialog": {
-      "title": "WorkBuddy アカウントを削除",
-      "confirm": "「{{name}}」を削除しますか？ステータス、クォータ、モデルの関連付けも削除されます。",
-      "delete": "削除"
-    },
-    "login": {
-      "title": "WorkBuddy アカウントを追加",
-      "reauthTitle": "WorkBuddy アカウントを再認証",
-      "starting": "ログインリンクを取得中…",
-      "instructions": "開いた WorkBuddy のページでログインし、アクセスを承認してください。このダイアログは自動で続行します。ページが開かない場合は下のボタンを使用してください：",
-      "authorize": "ログインページを開く",
-      "waiting": "ログイン待機中…"
-    },
-    "quota": {
-      "credits": "クレジット",
-      "resetsOn": "{{date}} にリセット",
-      "expiresOn": "{{date}} に期限切れ",
-      "unknown": "クォータ未同期 — アカウントを更新してください"
-    },
-    "sync": {
-      "synced": "同期済み",
-      "failed": "失敗",
-      "reauthRequired": "再認証が必要",
-      "stale": "前回同期したモデルを使用",
-      "partial": "一部",
-      "unknown": "未同期"
-    },
-    "region": {
-      "cn": "中国サイト",
-      "intl": "国際サイト"
-    },
-    "regionDialog": {
-      "title": "ログイン先サイトを選択",
-      "description": "アカウントが属する WorkBuddy サイトを選択してください。該当サイトでログインします。",
-      "cn": "中国サイト",
-      "cnHint": "中国本土のアカウント向け。Tencent Cloud 中国サイトでログインします",
-      "intl": "国際サイト",
-      "intlHint": "海外アカウント向け。CodeBuddy 国際サイトでログインします",
-      "continue": "ログインへ進む"
-    },
-    "importDialog": {
-      "title": "WorkBuddy アカウントをインポート",
-      "dropzone": "JSON ファイルをここにドロップ、またはクリックして選択",
-      "hint": "エクスポートした WorkBuddy アカウント JSON。中国／国際サイトはファイル内の realm と domain から判定します",
-      "selectedCount": "{{count}} 件のファイルを選択",
-      "import": "インポート",
-      "importWithCount": "{{count}} 件をインポート",
-      "cancel": "キャンセル",
-      "done": "完了",
-      "summary": "{{total}} 件中 {{imported}} 件成功、{{failed}} 件失敗",
-      "imported": "インポート済み",
-      "failed": "失敗",
-      "unnamed": "名称未設定のアカウント",
-      "toastDone": "アカウントのインポートが完了しました",
-      "toastFailed": "アカウントのインポートに失敗しました"
-    }
-  },
+
   "test": {
     "title": "{{name}} モデルテスト",
     "headers": {
@@ -518,6 +502,15 @@
       "deleteFailed": "モデル削除に失敗しました",
       "deleteSuccess": "モデルを削除しました"
     }
+  },
+
+  "quotaEntries": {
+    "allowance": "プラン枠",
+    "credits": "クレジット",
+    "balance": "残高",
+    "resetsOn": "{{date}} にリセット",
+    "expiresOn": "{{date}} に期限切れ",
+    "unknown": "クォータ未同期 — アカウントを更新してください"
   },
   "utils": {
     "justNow": "たった今"

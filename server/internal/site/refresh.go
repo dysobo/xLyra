@@ -16,7 +16,6 @@ import (
 	"xlyra/server/internal/adapter"
 	"xlyra/server/internal/catalog"
 	"xlyra/server/internal/modelcapabilities"
-	oauthsvc "xlyra/server/internal/oauth"
 	"xlyra/server/internal/protocolspec"
 	"xlyra/server/internal/store"
 	"xlyra/server/internal/upstream"
@@ -74,16 +73,57 @@ const refreshKeySummaryWorkers = 4
 const siteMetaAutoDisabledByRefresh = "auto_disabled_by_refresh"
 const credentialMetaAutoDisabledByRefresh = "auto_disabled_by_refresh"
 
+// partial is a persisted sync status the site UI already treats as non-fatal
+// when validation stays ok. "skipped" is only the in-memory fallback for a
+// missing state row.
+const pluginProviderUnavailableSyncStatus = "partial"
+
 func (s *Service) RefreshState(ctx context.Context, siteID uuid.UUID) (RefreshResult, error) {
+	var (
+		poolAPI        pluginAccountAPI
+		pool           bool
+		accountResults []AccountRefreshResult
+		accountErr     error
+	)
+	if preview, previewErr := s.Get(ctx, siteID); previewErr == nil {
+		if api, ok := s.pluginAccountAPI(preview.SiteType); ok {
+			poolAPI = api
+			pool = true
+			// RefreshAll takes the per-site lock around each account write.
+			// Call it before this method locks, or the non-reentrant mutex
+			// deadlocks. The child budget is shorter than the scheduler's
+			// 10 minute batch so one plugin site cannot cancel the sites
+			// that run after it.
+			accountCtx, accountCancel := context.WithTimeout(ctx, pluginSiteAccountRefreshBudget)
+			accountResults, accountErr = poolAPI.RefreshAll(accountCtx, siteID)
+			accountCancel()
+		}
+	}
+
+	// Probes already stopped when the caller canceled. The timeout still has
+	// to be stored; a canceled context cannot reach the database.
+	followCtx := ctx
+	if pool && ctx.Err() != nil {
+		followCtx = context.WithoutCancel(ctx)
+	}
+
 	defer s.siteLocks.lock(siteID)()
 
-	site, err := s.Get(ctx, siteID)
+	site, err := s.Get(followCtx, siteID)
 	if err != nil {
 		return RefreshResult{}, err
 	}
 
 	stateRepo := store.NewSiteStateRepository(s.db.DB())
-	_, _ = stateRepo.MarkSyncStarted(ctx, siteID)
+	_, _ = stateRepo.MarkSyncStarted(followCtx, siteID)
+
+	if pluginProviderUnavailable(site.SiteType) {
+		return s.markRefreshProviderUnavailable(followCtx, site)
+	}
+
+	if pool && strings.EqualFold(strings.TrimSpace(site.SiteType), poolAPI.siteType) {
+		return s.finishPluginAccountPoolRefresh(followCtx, site, poolAPI, accountResults, accountErr)
+	}
 
 	module, ok := s.adapters.ModuleForSiteType(site.SiteType)
 	if !ok {
@@ -111,23 +151,11 @@ func (s *Service) RefreshState(ctx context.Context, siteID uuid.UUID) (RefreshRe
 	}
 
 	if refreshErr == nil && result.Site.ID != uuid.Nil {
-		if matchedModels, err := catalog.NewService(s.db, s.confFile).MatchSiteModels(ctx, site.ID); err == nil {
-			result.Models = availableSiteModels(matchedModels)
-		}
-		if unpriced := s.syncCanonicalPricingFallback(ctx, site.ID, result.Models); len(unpriced) > 0 {
-			message := fmt.Sprintf("%d models have no pricing and will record zero cost: %s", len(unpriced), strings.Join(unpriced, ", "))
-			if state, err := stateRepo.MarkPricingGap(ctx, site.ID, message); err == nil {
-				result.State = state
-			}
-		}
+		result.Models, result.State = s.matchAndPriceSiteModels(ctx, site, result.Models, result.State)
 	}
 
 	if fresh, err := s.Get(ctx, siteID); err == nil {
 		probed := s.runQuotaProbes(ctx, fresh)
-		if isWorkBuddySiteType(fresh.SiteType) {
-			// WorkBuddy has no site-level probe; its quota is the sum of its accounts.
-			probed = s.syncWorkBuddyQuotaSummary(ctx, fresh.ID, probed)
-		}
 		if strings.EqualFold(strings.TrimSpace(fresh.SiteType), "grok") {
 			probed = s.syncGrokQuotaSummary(ctx, fresh.ID, probed)
 		}
@@ -137,6 +165,22 @@ func (s *Service) RefreshState(ctx context.Context, siteID uuid.UUID) (RefreshRe
 	}
 
 	return result, refreshErr
+}
+
+// matchAndPriceSiteModels binds site models to the canonical catalog, writes
+// canonical fallback prices, then records a pricing-gap warning. Models that
+// already have an upstream or manual price are left in place.
+func (s *Service) matchAndPriceSiteModels(ctx context.Context, site store.Site, models []store.SiteModel, state store.SiteState) ([]store.SiteModel, store.SiteState) {
+	if matchedModels, err := catalog.NewService(s.db, s.confFile).MatchSiteModels(ctx, site.ID); err == nil {
+		models = availableSiteModels(matchedModels)
+	}
+	if unpriced := s.syncCanonicalPricingFallback(ctx, site.ID, models); len(unpriced) > 0 {
+		message := fmt.Sprintf("%d models have no pricing and will record zero cost: %s", len(unpriced), strings.Join(unpriced, ", "))
+		if next, err := store.NewSiteStateRepository(s.db.DB()).MarkPricingGap(ctx, site.ID, message); err == nil {
+			state = next
+		}
+	}
+	return models, state
 }
 
 func xlyraRefreshCanFallbackToAPIKey(err error) bool {
@@ -180,6 +224,9 @@ func (s *Service) RefreshAllStates(ctx context.Context) ([]RefreshBatchItem, err
 }
 
 func (s *Service) shouldSkipBulkRefresh(ctx context.Context, item store.Site) (bool, string) {
+	if pluginProviderUnavailable(item.SiteType) {
+		return true, pluginProviderUnavailableDetail(item.SiteType, "skipped by bulk refresh")
+	}
 	if !item.Enabled && !siteAutoDisabledByRefresh(item) {
 		return true, "site is disabled; skipped by bulk refresh"
 	}
@@ -725,8 +772,8 @@ func (s *Service) refreshModelOnlyState(ctx context.Context, item store.Site) (R
 		if err != nil {
 			return RefreshResult{}, err
 		}
-	} else if isWorkBuddySiteType(item.SiteType) {
-		apiKeyCount, err = s.workBuddySiteAccountCount(ctx, item.ID)
+	} else if IsAccountLoginSite(item.SiteType) {
+		apiKeyCount, err = s.accountPoolCredentialCount(ctx, item.ID, item.SiteType)
 		if err != nil {
 			return RefreshResult{}, err
 		}
@@ -867,11 +914,49 @@ func restoreAPIKeyStateAfterAuthRecovery(ctx context.Context, repo store.SiteAPI
 	return state, nil
 }
 
+func pluginProviderUnavailableDetail(siteType, detail string) string {
+	return fmt.Sprintf("provider plugin for site_type %q is unavailable; %s", strings.TrimSpace(siteType), detail)
+}
+
+// markRefreshProviderUnavailable records a skipped sync and leaves the site
+// enabled. The provider row is still in the database; only its plugin is gone.
+func (s *Service) markRefreshProviderUnavailable(ctx context.Context, item store.Site) (RefreshResult, error) {
+	now := time.Now()
+	repo := store.NewSiteStateRepository(s.db.DB())
+	existing, err := repo.GetBySite(ctx, item.ID)
+	if err != nil && !errorsIsNotFound(err) {
+		return RefreshResult{}, err
+	}
+	var lastSynced any
+	if existing.LastSyncedAt.Valid {
+		lastSynced = existing.LastSyncedAt.Time
+	}
+	state, err := repo.Upsert(ctx, store.UpsertSiteStateParams{
+		SiteID:            item.ID,
+		ValidationOK:      true,
+		SyncStatus:        pluginProviderUnavailableSyncStatus,
+		SyncMessage:       pluginProviderUnavailableDetail(item.SiteType, "refresh skipped"),
+		LastSyncStartedAt: now,
+		LastSyncedAt:      lastSynced,
+		APIKeyCount:       existing.APIKeyCount,
+		ModelCount:        existing.ModelCount,
+		RawStatus:         existing.RawStatus,
+		UserSummary:       existing.UserSummary,
+		Pricing:           existing.Pricing,
+		Checkin:           existing.Checkin,
+	})
+	if err != nil {
+		return RefreshResult{}, err
+	}
+	return RefreshResult{Site: item, State: state}, nil
+}
+
 func (s *Service) markRefreshFailed(ctx context.Context, item store.Site, message string) (RefreshResult, error) {
 	now := time.Now()
 	failure := upstream.ClassifyMessage(message)
+	lowerMessage := strings.ToLower(message)
 	recoverable := failure.Limited() || failure.Transient() ||
-		(strings.Contains(strings.ToLower(message), "enabled api keys failed") && !failure.CredentialInvalid())
+		((strings.Contains(lowerMessage, "enabled api keys failed") || strings.Contains(lowerMessage, "enabled accounts failed") || strings.Contains(lowerMessage, "plugin account refresh timed out")) && !failure.CredentialInvalid())
 	validationOK := false
 	syncStatus := "failed"
 	if recoverable {
@@ -1144,20 +1229,11 @@ func (s *Service) RefreshSingleAPIKey(ctx context.Context, siteID uuid.UUID, cre
 		_ = json.Unmarshal(credential.Meta, &meta)
 	}
 	apiKey := strings.TrimSpace(secretFromCredentialMeta(secret, meta))
-	var workBuddyAccess *oauthsvc.WorkBuddyAccess
 	if strings.EqualFold(strings.TrimSpace(site.SiteType), "grok") {
 		apiKey, err = s.oauth.EnsureGrokAccessToken(ctx, credential.ID)
 		if err != nil {
 			return RefreshSingleAPIKeyResult{}, fmt.Errorf("grok access token: %w", err)
 		}
-	} else if isWorkBuddySiteType(site.SiteType) {
-		var access oauthsvc.WorkBuddyAccess
-		access, err = s.oauth.EnsureWorkBuddyAccess(ctx, credential.ID)
-		if err != nil {
-			return RefreshSingleAPIKeyResult{}, fmt.Errorf("workbuddy access token: %w", err)
-		}
-		apiKey = access.Token
-		workBuddyAccess = &access
 	}
 	if apiKey == "" || strings.HasPrefix(apiKey, "missing-api-key") {
 		return RefreshSingleAPIKeyResult{}, fmt.Errorf("raw api key is not available for this credential")
@@ -1165,9 +1241,6 @@ func (s *Service) RefreshSingleAPIKey(ctx context.Context, siteID uuid.UUID, cre
 
 	now := time.Now()
 	adapterSite := s.toAdapterSite(ctx, site)
-	if workBuddyAccess != nil {
-		adapterSite = workBuddySiteConfig(adapterSite, *workBuddyAccess)
-	}
 	apiKeyStateRepo := store.NewSiteAPIKeyStateRepository(s.db.DB())
 	apiKeyModelRepo := store.NewSiteAPIKeyModelRepository(s.db.DB())
 
@@ -1327,8 +1400,8 @@ func (s *Service) syncSiteModelsFromAPIKeyState(ctx context.Context, siteID uuid
 			capabilities = codexSiteModelCapabilities(rawCapabilitiesByModel[name], name)
 		} else if strings.EqualFold(strings.TrimSpace(siteType), "grok") {
 			capabilities = grokSiteModelCapabilities(rawCapabilitiesByModel[name], name)
-		} else if isWorkBuddySiteType(siteType) {
-			capabilities = workBuddySiteModelCapabilities(rawCapabilitiesByModel[name])
+		} else if s.pluginModelsPerAccount(siteType) {
+			capabilities = pluginAccountSiteModelCapabilities(rawCapabilitiesByModel[name])
 		} else if strings.EqualFold(strings.TrimSpace(siteType), "opencode_go") {
 			var capabilityErr error
 			capabilities, capabilityErr = openCodeGoSiteModelCapabilities(rawCapabilitiesByModel[name], name)
@@ -1446,17 +1519,13 @@ func grokSiteModelCapabilities(raw store.JSON, modelName string) []byte {
 	return encoded
 }
 
-func workBuddySiteModelCapabilities(raw store.JSON) []byte {
+func pluginAccountSiteModelCapabilities(raw store.JSON) []byte {
 	capabilities := map[string]any{}
 	if len(raw) > 0 {
 		_ = json.Unmarshal(raw, &capabilities)
 	}
 	if capabilities == nil {
 		capabilities = map[string]any{}
-	}
-	capabilities["source"] = "workbuddy"
-	if len(stringSliceFromPricingRaw(capabilities["supported_endpoint_types"])) == 0 {
-		capabilities["supported_endpoint_types"] = []string{"openai"}
 	}
 	return jsonBytes(capabilities)
 }
@@ -1563,7 +1632,7 @@ func markMissingManagedAPIKeysStale(
 		seen[key.credential.ID] = struct{}{}
 	}
 	for _, credential := range credentials {
-		if !isSiteAPIKeyCredentialType(credential.CredentialType) {
+		if !store.IsAPIKeyCredentialType(credential.CredentialType) {
 			continue
 		}
 		if _, ok := seen[credential.ID]; ok {

@@ -4,7 +4,6 @@ export function siteTypeIconPath(siteType: string): string | undefined {
   if (type === 'anthropic') return '/brand-icons/anthropic.png'
   if (type === 'google_gemini') return '/brand-icons/google.png'
   if (type === 'grok') return '/brand-icons/grok.png'
-  if (type === 'workbuddy') return '/brand-icons/workbuddy.svg'
   if (type === 'opencode_go') return '/brand-icons/opencode.png'
   if (type === 'deepseek') return '/brand-icons/deepseek.png'
   if (type === 'minimax') return '/brand-icons/minimax.png'

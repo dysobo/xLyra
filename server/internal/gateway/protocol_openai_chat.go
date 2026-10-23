@@ -17,9 +17,10 @@ type openAIChatProtocolAdapter struct {
 	path               string
 	mimoTTS            bool
 	mimoTTSFormat      string
-	// workBuddy marks the CodeBuddy upstream: it only serves streaming chat
-	// completions, so non-streaming clients get the SSE folded back into JSON.
-	workBuddy bool
+	// aggregateChatSSE folds an upstream chat SSE body into one JSON response
+	// when a plugin site says the upstream only speaks chat SSE, and only when
+	// the downstream request did not ask for a stream.
+	aggregateChatSSE bool
 }
 
 func (a openAIChatProtocolAdapter) ProtocolName() string {
@@ -76,15 +77,7 @@ func newOpenAIChatProtocolAdapter(request gatewayRequest, candidate routeengine.
 		path:               spec.Path,
 		mimoTTS:            isMiMoV25TTSModel(candidate.Model.UpstreamName),
 		mimoTTSFormat:      strings.ToLower(stringFromMapAny(audio, "format")),
-		workBuddy:          isWorkBuddySite(candidate.Site.SiteType),
-	}
-}
-
-// ApplyUpstreamHeaders implements gatewayProtocolHeaderAdapter. Only the
-// WorkBuddy upstream needs extra headers; accountID carries its tenant domain.
-func (a openAIChatProtocolAdapter) ApplyUpstreamHeaders(req *http.Request, upstreamKey string, accountID string, _ bool) {
-	if a.workBuddy {
-		applyWorkBuddyGatewayHeaders(req, upstreamKey, accountID)
+		aggregateChatSSE:   pluginSiteUpstreamStreamOnly(candidate.Site.SiteType) && !request.Stream,
 	}
 }
 
@@ -97,9 +90,6 @@ func (a openAIChatProtocolAdapter) applyUpstreamPolicy(payload map[string]any, c
 		payload["audio"] = audio
 	}
 	payload = applyChatUpstreamPolicy(payload, candidate)
-	if a.workBuddy {
-		rewriteWorkBuddyBlockedPhrases(payload)
-	}
 	if a.mimoTTS {
 		delete(payload, "stream_options")
 		delete(payload, "max_tokens")
@@ -130,7 +120,7 @@ func (a openAIChatProtocolAdapter) TransformBufferedResponse(statusCode int, hea
 			Usage:       usage,
 		}, nil
 	}
-	if a.workBuddy && statusCode >= 200 && statusCode < 300 && (isEventStreamContentType(contentType) || looksLikeSSEBody(body)) {
+	if a.aggregateChatSSE && statusCode >= 200 && statusCode < 300 && (isEventStreamContentType(contentType) || looksLikeSSEBody(body)) {
 		aggregated, err := aggregateChatCompletionSSE(body)
 		if err != nil {
 			return gatewayBufferedResponse{}, err
@@ -159,7 +149,7 @@ func (a openAIChatProtocolAdapter) TransformBufferedResponse(statusCode int, hea
 }
 
 func (a openAIChatProtocolAdapter) usesRawBufferedResponse() bool {
-	return a.mimoTTS || a.workBuddy
+	return a.mimoTTS || a.aggregateChatSSE
 }
 
 func (a openAIChatProtocolAdapter) ProxyStream(ctx context.Context, w http.ResponseWriter, resp *http.Response, startedAt time.Time, candidate routeengine.Candidate) (streamCaptureState, bool, error) {
