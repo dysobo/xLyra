@@ -634,62 +634,6 @@
         "reasoning_summary": "passthrough"
       }
     },
-    "workbuddy": {
-      "protocol": "openai_chat",
-      "official_base_url": "https://copilot.tencent.com",
-      "path": "/v2/chat/completions",
-      "documentation": [
-        "https://cloud.tencent.com/document/product/1831/137057",
-        "https://cnb.cool/codebuddy/openapp_example",
-        "https://www.codebuddy.ai/docs/cli/quickstart"
-      ],
-      "request_params": {
-        "forced": {
-          "stream": true
-        },
-        "defaults": {
-          "reasoning_effort": "medium",
-          "reasoning_summary": "auto"
-        }
-      },
-      "workbuddy": {
-        "default_region": "cn",
-        "client": {
-          "version": "2.63.2",
-          "user_agent": "CLI/{version} CodeBuddy/{version}",
-          "product": "SaaS",
-          "product_code": "p_tcaca"
-        },
-        "endpoints": {
-          "auth_state": "/v2/plugin/auth/state?platform=CLI",
-          "auth_token": "/v2/plugin/auth/token",
-          "token_refresh": "/v2/plugin/auth/token/refresh",
-          "account": "/v2/plugin/login/account",
-          "models": "/v3/config",
-          "billing": "/v2/billing/meter/get-user-resource"
-        },
-        "regions": [
-          {
-            "id": "cn",
-            "label": "国内站",
-            "label_en": "China site",
-            "base_url": "https://copilot.tencent.com",
-            "origin": "https://www.codebuddy.cn",
-            "domains": ["www.codebuddy.cn"],
-            "realms": ["cn", "china", "domestic"]
-          },
-          {
-            "id": "intl",
-            "label": "国际站",
-            "label_en": "International site",
-            "base_url": "https://www.codebuddy.ai",
-            "origin": "https://www.codebuddy.ai",
-            "domains": ["www.codebuddy.ai"],
-            "realms": ["intl", "international", "global", "overseas"]
-          }
-        ]
-      }
-    },
     "opencode_go": {
       "protocol": "openai_chat",
       "official_base_url": "https://opencode.ai/zen/go",

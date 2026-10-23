@@ -1277,7 +1277,7 @@ func (h Handler) resolveSiteCredentials(w http.ResponseWriter, r *http.Request, 
 	credType := sitepkg.CredentialTypeForSiteType(payload.SiteType)
 
 	switch credType {
-	case "grok_sso", "workbuddy_oauth":
+	case "grok_sso":
 		return nil, true
 	case "system_token":
 		if payload.NewAPI == nil || strings.TrimSpace(payload.NewAPI.AccessToken) == "" || payload.NewAPI.UserID <= 0 {
@@ -1745,6 +1745,9 @@ func sitePayload(item store.Site) map[string]any {
 			payload["quota_probe"] = v
 		}
 	}
+	if status := sitepkg.ProviderStatus(item.SiteType); status != "" {
+		payload["provider_status"] = status
+	}
 
 	return payload
 }
@@ -1797,8 +1800,8 @@ func (h Handler) sitePayloadWithCapabilities(item store.Site) map[string]any {
 }
 
 // withAccountCounts adds account_count / valid_account_count to the payload of
-// account-login sites (Grok, WorkBuddy). They come from the stored accounts, so
-// a failed site refresh that zeroes the cached site state cannot hide accounts.
+// account-login sites. They come from the stored accounts, so a failed site
+// refresh that zeroes the cached site state cannot hide accounts.
 func (h Handler) withAccountCounts(ctx context.Context, payload map[string]any, site store.Site) map[string]any {
 	if h.sites == nil || !sitepkg.IsAccountLoginSite(site.SiteType) {
 		return payload
@@ -1970,6 +1973,14 @@ func siteHealthResultPayload(result sitepkg.HealthResult) map[string]any {
 		"health": siteHealthStatePayload(result.State),
 		"recent": recent,
 		"meta":   map[string]any{"recent_count": len(recent)},
+	}
+	if result.Skipped {
+		payload["ok"] = true
+		payload["skipped"] = true
+		if reason := strings.TrimSpace(result.SkipReason); reason != "" {
+			payload["skip_reason"] = reason
+		}
+		return payload
 	}
 	if result.Snapshot.ID != uuid.Nil {
 		payload["snapshot"] = healthSnapshotPayload(result.Snapshot)
@@ -2438,37 +2449,21 @@ func intFromAny(value any) int {
 	}
 }
 
+// siteTypeIconURL is the admin icon for a site type. A type still in the
+// snapshot keeps its registered IconURL, including the ?v= cache key.
+// A plugin type (the id contains "/") that has dropped out of that snapshot
+// — the provider was disabled — still points at the icon endpoint, which
+// serves the uploaded package. There is no package sha left to append, so
+// the cache key is omitted. Built-in names never contain "/".
 func siteTypeIconURL(siteType string) string {
-	switch strings.TrimSpace(strings.ToLower(siteType)) {
-	case "openai":
-		return "/brand-icons/openai.png"
-	case "opencode_go":
-		return "/brand-icons/opencode.png"
-	case "anthropic":
-		return "/brand-icons/anthropic.png"
-	case "google_gemini":
-		return "/brand-icons/google.png"
-	case "deepseek":
-		return "/brand-icons/deepseek.png"
-	case "minimax":
-		return "/brand-icons/minimax.png"
-	case "xiaomi_mimo":
-		return "/brand-icons/xiaomi.png"
-	case "moonshot":
-		return "/brand-icons/moonshot.png"
-	case "kimi_code":
-		return "/brand-icons/moonshot.png"
-	case "newapi":
-		return "/brand-icons/newapi.png"
-	case "xlyra":
-		return "/brand-icons/xlyra.png"
-	case "codex":
-		return "/oauth-icons/codex.svg"
-	case "antigravity":
-		return "/oauth-icons/antigravity.png"
-	case "claude_code":
-		return "/brand-icons/anthropic.png"
-	default:
+	if desc, ok := sitepkg.LookupSiteType(siteType); ok {
+		return desc.IconURL
+	}
+	key := strings.ToLower(strings.TrimSpace(siteType))
+	pluginID, _, found := strings.Cut(key, "/")
+	pluginID = strings.TrimSpace(pluginID)
+	if !found || pluginID == "" {
 		return ""
 	}
+	return "/api/v1/plugin-icons/" + pluginID
 }

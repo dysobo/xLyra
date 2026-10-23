@@ -94,10 +94,7 @@ func Version() (int, error) {
 }
 
 func Validate() error {
-	if _, err := loadModelEndpointRegistry(); err != nil {
-		return err
-	}
-	_, err := WorkBuddy()
+	_, err := loadModelEndpointRegistry()
 	return err
 }
 

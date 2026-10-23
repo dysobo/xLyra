@@ -10,8 +10,8 @@ import (
 	"xlyra/server/internal/store"
 )
 
-// Account models (Grok and WorkBuddy) carry the same endpoint information as
-// API key models so the protocol editor can be shared.
+// Account models carry the same endpoint information as API key models so the
+// protocol editor can be shared.
 
 func nonNilStrings(values []string) []string {
 	if values == nil {

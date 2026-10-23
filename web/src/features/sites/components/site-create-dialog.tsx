@@ -25,6 +25,9 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { siteTypeIconPath } from '@/components/common/brand-utils'
+import { accountCreateHint } from '@/features/sites/components/account-provider-login'
+import { SiteTypeIcon } from '@/features/sites/components/site-type-icon'
+import { SiteTypePluginTag } from '@/features/sites/components/site-type-plugin-tag'
 import { cn } from '@/lib/utils'
 import {
   type CreateSiteInput,
@@ -33,6 +36,7 @@ import {
 } from '@/features/sites/api/sites'
 import type { SiteGroup } from '@/features/settings/api/site-groups'
 import { type ProxyConfig } from '@/features/settings/api/settings'
+import { providerSubtitle, siteTypeDisplayName } from '@/features/sites/lib/localized-site-type-text'
 import { isAccountLoginSiteType, siteTypeIconClassName } from '@/features/sites/lib/site-utils'
 import { editSiteFormResetKey } from '@/features/sites/lib/site-cache'
 import {
@@ -96,7 +100,7 @@ function createSiteSchema(mode: SiteFormMode, siteTypes: SiteTypeInfo[] | undefi
         try { new URL(value.baseUrl) } catch {
           ctx.addIssue({ code: 'custom', path: ['baseUrl'], message: t('form.validation.urlInvalid') })
         }
-      } else if (!isAccountLoginSiteType(value.siteType) && requiresBaseURL(value.siteType, siteTypes)) {
+      } else if (!isAccountLoginSiteType(value.siteType, siteTypes) && requiresBaseURL(value.siteType, siteTypes)) {
         ctx.addIssue({ code: 'custom', path: ['baseUrl'], message: t('form.validation.urlRequired') })
       }
 
@@ -145,7 +149,7 @@ function createSiteSchema(mode: SiteFormMode, siteTypes: SiteTypeInfo[] | undefi
         }
       }
 
-      if (!isAccountLoginSiteType(value.siteType) && credType !== 'system_token' && credType !== 'oauth' && credType !== 'xlyra' && mode === 'create' && value.apiKeys.length === 0) {
+      if (!isAccountLoginSiteType(value.siteType, siteTypes) && credType !== 'system_token' && credType !== 'oauth' && credType !== 'xlyra' && mode === 'create' && value.apiKeys.length === 0) {
         ctx.addIssue({
           code: 'custom',
           path: ['apiKeys'],
@@ -153,7 +157,7 @@ function createSiteSchema(mode: SiteFormMode, siteTypes: SiteTypeInfo[] | undefi
         })
       }
 
-      if (!isAccountLoginSiteType(value.siteType) && value.responsesToolPolicy === 'compatibility' && !value.disableResponsesImageGenerationTool) {
+      if (!isAccountLoginSiteType(value.siteType, siteTypes) && value.responsesToolPolicy === 'compatibility' && !value.disableResponsesImageGenerationTool) {
         ctx.addIssue({
           code: 'custom',
           path: ['disableResponsesImageGenerationTool'],
@@ -421,6 +425,7 @@ function ProviderWall({ siteTypes, onSelect, language, t }: { siteTypes: SiteTyp
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {group.items.map((st) => {
               const icon = siteTypeIconPath(st.site_type) ?? st.icon_url
+              const name = siteTypeDisplayName(st, language)
               const subtitle = providerSubtitle(st, language, t)
               return (
                 <button
@@ -429,19 +434,17 @@ function ProviderWall({ siteTypes, onSelect, language, t }: { siteTypes: SiteTyp
                   className="flex w-full items-center gap-3 rounded-inner border border-separator bg-fill-4 px-4 py-3 text-left hover:bg-fill-3 transition-colors cursor-pointer"
                   onClick={() => onSelect(st.site_type)}
                 >
-                  {icon ? (
-                    <img
-                      src={icon}
-                      alt=""
-                      className={cn('h-8 w-8 shrink-0 rounded-control object-contain', siteTypeIconClassName(st.site_type))}
-                    />
-                  ) : (
-                    <div className="h-8 w-8 shrink-0 rounded-control bg-fill-3 flex items-center justify-center text-body font-medium text-label-2">
-                      {st.display_name.charAt(0)}
-                    </div>
-                  )}
+                  <SiteTypeIcon
+                    src={icon}
+                    name={name}
+                    className="h-8 w-8 shrink-0 rounded-control"
+                    imageClassName={siteTypeIconClassName(st.site_type)}
+                  />
                   <div className="min-w-0 flex-1">
-                    <div className="text-headline text-label">{st.display_name}</div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="text-headline text-label">{name}</div>
+                      <SiteTypePluginTag pluginId={st.plugin_id} />
+                    </div>
                     {subtitle ? (
                       <div className="truncate text-footnote text-label-2">{subtitle}</div>
                     ) : null}
@@ -456,16 +459,8 @@ function ProviderWall({ siteTypes, onSelect, language, t }: { siteTypes: SiteTyp
   )
 }
 
-function providerSubtitle(siteType: SiteTypeInfo, language: string, t: (key: string) => string) {
-  const key = `form.providerSubtitles.${siteType.site_type}`
-  const translated = t(key)
-  if (translated !== key) return translated
-  if (!language.startsWith('zh') && /[\u4e00-\u9fff]/.test(siteType.subtitle)) return undefined
-  return siteType.subtitle
-}
-
 function providerGroups(providers: SiteTypeInfo[], t: (key: string) => string) {
-  const official = providers.filter((st) => st.credential_type === 'api_key' || isAccountLoginSiteType(st.site_type))
+  const official = providers.filter((st) => st.credential_type === 'api_key' || isAccountLoginSiteType(st.site_type, providers))
   const relay = providers
     .filter((st) => st.site_type === 'xlyra' || st.site_type === 'newapi' || st.credential_type === 'system_token')
     .sort((a, b) => relayProviderRank(a.site_type) - relayProviderRank(b.site_type))
@@ -550,7 +545,8 @@ export function SiteCreateDialog({
   const showSystemTokenFields = currentCredType === 'system_token'
   const showXLyraFields = currentCredType === 'xlyra'
   const xlyraAuthMode = useWatch({ control, name: 'xlyraAuthMode' })
-  const isGrok = isAccountLoginSiteType(siteType)
+  const isGrok = isAccountLoginSiteType(siteType, siteTypes)
+  const accountHint = accountCreateHint(siteType, siteTypes?.find((item) => item.site_type === siteType), i18n.language)
   const canConfigureQuotaProbe = siteType === 'openai' || siteType === 'anthropic'
   const showAPIKeyField = !isGrok && currentCredType !== 'system_token' && currentCredType !== 'oauth' && currentCredType !== 'xlyra' && !!siteType && mode === 'create'
   const supportsAPIKeyCostMultiplier = siteType === 'openai' || siteType === 'anthropic' || siteType === 'google_gemini'
@@ -562,6 +558,7 @@ export function SiteCreateDialog({
 
   const selectedProvider = siteType || null
   const selectedProviderInfo = siteTypes?.find(st => st.site_type === selectedProvider)
+  const selectedProviderName = selectedProviderInfo ? siteTypeDisplayName(selectedProviderInfo, i18n.language) : ''
   const selectedProviderIcon = selectedProvider
     ? siteTypeIconPath(selectedProvider) ?? selectedProviderInfo?.icon_url
     : null
@@ -613,7 +610,7 @@ export function SiteCreateDialog({
   function handleSelectProvider(siteType: string) {
     setValue('siteType', siteType, { shouldDirty: true })
     setValue('apiKeys', [], { shouldDirty: false })
-    if (isAccountLoginSiteType(siteType) || !requiresBaseURL(siteType, siteTypes)) {
+    if (isAccountLoginSiteType(siteType, siteTypes) || !requiresBaseURL(siteType, siteTypes)) {
       setValue('baseUrl', '')
     }
   }
@@ -713,7 +710,7 @@ export function SiteCreateDialog({
             }
           : undefined,
       requestHeaders: values.requestHeaders.filter((h) => h.key.trim()),
-      gateway: isAccountLoginSiteType(values.siteType)
+      gateway: isAccountLoginSiteType(values.siteType, siteTypes)
         ? undefined
         : {
             responsesToolPolicy: values.responsesToolPolicy,
@@ -771,15 +768,15 @@ export function SiteCreateDialog({
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                {selectedProviderIcon ? (
-                  <img
-                    src={selectedProviderIcon}
-                    alt=""
-                    className={cn('h-6 w-6 shrink-0 rounded-control object-contain', siteTypeIconClassName(selectedProvider))}
-                  />
-                ) : null}
+                <SiteTypeIcon
+                  src={selectedProviderIcon}
+                  name={selectedProviderName}
+                  empty="hidden"
+                  className="h-6 w-6 shrink-0 rounded-control"
+                  imageClassName={siteTypeIconClassName(selectedProvider)}
+                />
                 <DialogTitle>
-                  {selectedProviderInfo?.display_name ?? t('form.createTitle')}
+                  {selectedProviderInfo ? selectedProviderName : t('form.createTitle')}
                 </DialogTitle>
               </div>
             ) : (
@@ -836,7 +833,7 @@ export function SiteCreateDialog({
 
               {isGrok && mode === 'create' ? (
                 <FormSection title={t('form.sections.grokAccounts')} divided>
-                  <p className="text-body text-label-2">{t(siteType === 'workbuddy' ? 'form.workbuddyLoginHint' : 'form.grokDeviceHint')}</p>
+                  <p className="text-body text-label-2">{accountHint.override ?? t(accountHint.key)}</p>
                 </FormSection>
               ) : null}
 

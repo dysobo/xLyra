@@ -1209,7 +1209,7 @@ func encodeCanonicalMessagesAsChatMessages(messages []canonicalMessage) []any {
 	// function_call item. Parallel tool calls arrive as consecutive Responses
 	// items, but chat completions require one assistant message carrying every
 	// tool_call that is answered by the tool messages that follow it; separate
-	// assistant messages are rejected upstream (e.g. CodeBuddy code 11148).
+	// assistant messages are rejected by some chat upstreams.
 	var callBatch map[string]any
 	for _, message := range messages {
 		if message.Type != "function_call" {
@@ -1627,9 +1627,11 @@ func canonicalResponseFromResponsesResponse(response responsesResponse) canonica
 			Thinking: canonicalThinkingFromResponsesItem(map[string]any{
 				"type":               item.Type,
 				"content":            responsesOutputContentAsAny(item.Content),
+				"summary":            responsesOutputContentAsAny(item.Summary),
 				"reasoning_content":  item.ReasoningContent,
 				"thinking":           item.Thinking,
 				"thinking_signature": item.ThinkingSignature,
+				"encrypted_content":  item.EncryptedContent,
 			}),
 			CallID:        item.CallID,
 			Name:          item.Name,

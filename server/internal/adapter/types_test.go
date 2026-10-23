@@ -101,10 +101,6 @@ func TestRegistryRegistersDefaultModulesBySiteType(t *testing.T) {
 			wantType:         "adapter.Grok",
 			wantCapabilities: []Capability{CapabilityHealthProbe, CapabilityValidateCredential, CapabilityListModels, CapabilitySummarizeAPIKey},
 		},
-		"workbuddy": {
-			wantType:         "adapter.WorkBuddy",
-			wantCapabilities: []Capability{CapabilityHealthProbe, CapabilityValidateCredential, CapabilityListModels, CapabilitySummarizeAPIKey},
-		},
 		"opencode_go": {
 			wantType:         "adapter.OpenCodeGo",
 			wantCapabilities: []Capability{CapabilityHealthProbe, CapabilityListModels},
@@ -142,14 +138,59 @@ func TestRegistryRegistersDefaultModulesBySiteType(t *testing.T) {
 	}
 
 	modules := registry.Modules()
-	if len(modules) != 14 {
-		t.Fatalf("default module count = %d, want 14", len(modules))
+	if len(modules) != 13 {
+		t.Fatalf("default module count = %d, want 13", len(modules))
 	}
 	modules[0] = nil
 	fresh := registry.Modules()
 	if fresh[0] == nil {
 		t.Fatal("Modules should return a copy")
 	}
+}
+
+func TestRegistryLookupIsCaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRegistry()
+	registry.Register(namedSiteTypesModule{siteTypes: []string{" ACME.EXAMPLE/Chat ", "DeepSeek"}})
+
+	for _, siteType := range []string{"acme.example/chat", "ACME.EXAMPLE/CHAT", " DeepSeek ", "deepseek", " openai "} {
+		if _, ok := registry.ModuleForSiteType(siteType); !ok {
+			t.Fatalf("ModuleForSiteType(%q) not found", siteType)
+		}
+	}
+	if _, ok := registry.modulesByType["DeepSeek"]; ok {
+		t.Fatal("registry stored a mixed-case key")
+	}
+	if _, ok := registry.modulesByType["acme.example/chat"]; !ok {
+		t.Fatal("registry missing normalized plugin site type")
+	}
+	if _, ok := registry.modulesByType["deepseek"]; !ok {
+		t.Fatal("registry missing normalized deepseek key")
+	}
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{in: "DeepSeek", want: "deepseek"},
+		{in: " openai ", want: "openai"},
+		{in: "ACME.EXAMPLE/Chat", want: "acme.example/chat"},
+		{in: "", want: ""},
+		{in: "  ", want: ""},
+	}
+	for _, tc := range cases {
+		if got := normalizeSiteType(tc.in); got != tc.want {
+			t.Fatalf("normalizeSiteType(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+type namedSiteTypesModule struct {
+	siteTypes []string
+}
+
+func (m namedSiteTypesModule) SiteTypes() []string {
+	return m.siteTypes
 }
 
 func TestRegistryRegisterNormalizesAndSkipsEmptySiteTypes(t *testing.T) {

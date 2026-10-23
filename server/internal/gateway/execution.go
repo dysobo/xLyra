@@ -20,7 +20,6 @@ import (
 	"gorm.io/gorm"
 
 	"xlyra/server/internal/inflight"
-	oauthsvc "xlyra/server/internal/oauth"
 	"xlyra/server/internal/ratelimit"
 	routeengine "xlyra/server/internal/router"
 	"xlyra/server/internal/store"
@@ -145,6 +144,9 @@ func (h Handler) forwardGatewayRequest(
 			}
 		}
 	}
+	if err == nil {
+		credentials, err = h.preparePluginAccountCredentials(ctx, candidate, credentials)
+	}
 	if err != nil {
 		startedAt := time.Now()
 		result := gatewayAttemptResult{
@@ -266,81 +268,24 @@ func (h Handler) forwardGatewayRequest(
 			return result
 		}
 		accountID := gatewayCredentialMetaString(selectedCredential.Credential, "account_id")
-		if isCodexSite(candidate.Site.SiteType) {
-			connection, err := h.oauth.EnsureCodexConnectionFresh(ctx, candidate.Site.ID)
-			if err != nil {
-				result.statusCode = http.StatusBadGateway
-				result.errorType = "codex_oauth_refresh_failed"
-				result.errorMessage = err.Error()
-				result.latencyMS = time.Since(startedAt).Milliseconds()
-				result = recordCredentialAttempt(result, nil, false)
-				return result
-			}
-			upstreamKey = connection.AccessToken
-			accountID = connection.AccountID
-		}
-		if isAntigravitySite(candidate.Site.SiteType) {
-			connection, err := h.oauth.EnsureAntigravityConnectionFresh(ctx, candidate.Site.ID)
-			if err != nil {
-				result.statusCode = http.StatusBadGateway
-				result.errorType = "antigravity_oauth_refresh_failed"
-				result.errorMessage = err.Error()
-				result.latencyMS = time.Since(startedAt).Milliseconds()
-				result = recordCredentialAttempt(result, nil, false)
-				return result
-			}
-			upstreamKey = connection.AccessToken
-			accountID = connection.AccountID
-		}
-		if isClaudeCodeSite(candidate.Site.SiteType) {
-			connection, err := h.oauth.EnsureClaudeCodeConnectionFresh(ctx, candidate.Site.ID)
-			if err != nil {
-				result.statusCode = http.StatusBadGateway
-				result.errorType = "claude_code_oauth_refresh_failed"
-				result.errorMessage = err.Error()
-				result.latencyMS = time.Since(startedAt).Milliseconds()
-				result = recordCredentialAttempt(result, nil, false)
-				return result
-			}
-			upstreamKey = connection.AccessToken
-			accountID = connection.AccountID
-		}
-		if isGrokSite(candidate.Site.SiteType) {
-			accessToken, refreshErr := h.oauth.EnsureGrokAccessToken(ctx, selectedCredential.Credential.ID)
-			if refreshErr != nil {
-				if errors.Is(refreshErr, oauthsvc.ErrGrokReauthorizationRequired) {
-					h.markGrokCredentialReauthRequired(ctx, selectedCredential.Credential, refreshErr.Error())
-				}
-				result.statusCode = http.StatusBadGateway
-				result.errorType = "grok_oauth_refresh_failed"
-				result.errorMessage = refreshErr.Error()
-				result.latencyMS = time.Since(startedAt).Milliseconds()
-				result = recordCredentialAttempt(result, nil, true)
-				lastResult = result
-				if result.credentialDecision.ShouldTryNextCredential {
-					if releaseCredentialSelection != nil {
-						releaseCredentialSelection()
-					}
-					continue
-				}
-				return result
-			}
-			upstreamKey = accessToken
-		}
-		// upstreamBaseURL is the site's base URL; WorkBuddy accounts override it with
-		// the host of the site (China / international) they are logged in to.
+		// upstreamBaseURL is the site's base URL. A credential resolver may
+		// override it with the account's own upstream address.
 		upstreamBaseURL := candidate.Site.BaseURL
-		if isWorkBuddySite(candidate.Site.SiteType) {
-			access, refreshErr := h.oauth.EnsureWorkBuddyAccess(ctx, selectedCredential.Credential.ID)
-			if refreshErr != nil {
-				if errors.Is(refreshErr, oauthsvc.ErrWorkBuddyReauthorizationRequired) {
-					h.markGrokCredentialReauthRequired(ctx, selectedCredential.Credential, refreshErr.Error())
+		var headerVars map[string]string
+		if resolver := credentialResolverFor(candidate.Site.SiteType, selectedCredential.Credential.CredentialType); resolver != nil {
+			resolved, failure := resolver.Resolve(ctx, h, candidate, selectedCredential, upstreamKey, accountID)
+			if failure != nil {
+				if failure.MarkReauth {
+					h.markAccountCredentialReauthRequired(ctx, selectedCredential.Credential, failure.Err.Error())
 				}
 				result.statusCode = http.StatusBadGateway
-				result.errorType = "workbuddy_oauth_refresh_failed"
-				result.errorMessage = refreshErr.Error()
+				result.errorType = failure.ErrorType
+				result.errorMessage = failure.Err.Error()
 				result.latencyMS = time.Since(startedAt).Milliseconds()
-				result = recordCredentialAttempt(result, nil, true)
+				result = recordCredentialAttempt(result, nil, failure.TryNextCredential)
+				if !failure.TryNextCredential {
+					return result
+				}
 				lastResult = result
 				if result.credentialDecision.ShouldTryNextCredential {
 					if releaseCredentialSelection != nil {
@@ -350,11 +295,12 @@ func (h Handler) forwardGatewayRequest(
 				}
 				return result
 			}
-			upstreamKey = access.Token
-			// accountID is the per-account value handed to the protocol's
-			// header hook; for WorkBuddy it is the tenant domain.
-			accountID = access.Domain
-			upstreamBaseURL = access.Region.BaseURL
+			upstreamKey = resolved.Key
+			accountID = resolved.AccountID
+			if resolved.BaseURL != "" {
+				upstreamBaseURL = resolved.BaseURL
+			}
+			headerVars = resolved.HeaderVars
 		}
 
 		payload, err := buildGatewayUpstreamPayload(protocol, request, candidate)
@@ -363,6 +309,15 @@ func (h Handler) forwardGatewayRequest(
 			result.contentType = "application/json"
 			result.body = gatewayRequestFailureBody("request_encode_failed", err.Error(), requestID)
 			result.errorType = "request_encode_failed"
+			result.errorMessage = err.Error()
+			result.latencyMS = time.Since(startedAt).Milliseconds()
+			result = recordCredentialAttempt(result, nil, false)
+			return result
+		}
+		payload, err = applyProviderRewrite(ctx, candidate, protocol, payload)
+		if err != nil {
+			result.statusCode = http.StatusBadGateway
+			result.errorType = "plugin_rewrite_failed"
 			result.errorMessage = err.Error()
 			result.latencyMS = time.Since(startedAt).Milliseconds()
 			result = recordCredentialAttempt(result, nil, false)
@@ -446,18 +401,37 @@ func (h Handler) forwardGatewayRequest(
 		if isGrokSite(candidate.Site.SiteType) {
 			applyGrokGatewayHeaders(req, upstreamKey, candidate.Model.UpstreamName)
 		}
-		if isWorkBuddySite(candidate.Site.SiteType) {
-			applyWorkBuddyGatewayHeaders(req, upstreamKey, accountID)
-		}
 		if isClaudeCodeSite(candidate.Site.SiteType) {
 			applyClaudeCodeOAuthGatewayHeaders(req, upstreamKey)
 		}
 		if isOpenCodeZenSite(candidate) {
 			applyOpenCodeGoGatewayHeaders(req, request, upstreamKey)
 		}
+		if err := applyPluginRequestHeaders(req, candidate.Site.SiteType, headerVars, upstreamKey, upstreamBaseURL); err != nil {
+			result.statusCode = http.StatusBadGateway
+			result.errorType = "plugin_header_template_failed"
+			result.errorMessage = err.Error()
+			result.latencyMS = time.Since(startedAt).Milliseconds()
+			result = recordCredentialAttempt(result, nil, false)
+			return result
+		}
 		if err := signUpstreamRequest(req, protocol, body, upstreamKey); err != nil {
 			result.statusCode = http.StatusBadGateway
 			result.errorType = "upstream_sign_failed"
+			result.errorMessage = err.Error()
+			result.latencyMS = time.Since(startedAt).Milliseconds()
+			result = recordCredentialAttempt(result, nil, false)
+			return result
+		}
+
+		upstreamURL := ""
+		if req.URL != nil {
+			upstreamURL = req.URL.String()
+		}
+		upstreamClient, err = pluginUpstreamClient(candidate.Site.SiteType, upstreamURL, upstreamClient)
+		if err != nil {
+			result.statusCode = http.StatusBadGateway
+			result.errorType = "upstream_host_not_allowed"
 			result.errorMessage = err.Error()
 			result.latencyMS = time.Since(startedAt).Milliseconds()
 			result = recordCredentialAttempt(result, nil, false)
@@ -518,7 +492,7 @@ func (h Handler) forwardGatewayRequest(
 			result.errorType = transportErrorType(err)
 			result.errorMessage = err.Error()
 			result.latencyMS = time.Since(startedAt).Milliseconds()
-			result = recordCredentialAttempt(result, nil, isGrokSite(candidate.Site.SiteType) || isWorkBuddySite(candidate.Site.SiteType))
+			result = recordCredentialAttempt(result, nil, accountPoolCredentialFailover(selectedCredential.Credential.CredentialType))
 			if releaseCredentialSelection != nil {
 				releaseCredentialSelection()
 			}
@@ -535,12 +509,7 @@ func (h Handler) forwardGatewayRequest(
 
 		if request.Stream {
 			result = h.handleStreamResponse(ctx, w, requestID, apiKeyID, canonicalModelID, candidate, protocol, resp, result, startedAt)
-			if isGrokSite(candidate.Site.SiteType) {
-				h.markGrokCredentialSyncFailed(ctx, selectedCredential.Credential, result)
-			}
-			if isWorkBuddySite(candidate.Site.SiteType) {
-				h.markWorkBuddyCredentialSyncFailed(ctx, selectedCredential.Credential, result)
-			}
+			h.markAccountPoolAuthFailure(ctx, candidate.Site.SiteType, selectedCredential.Credential, result)
 			if !request.Diagnostic {
 				h.markCredentialModelUnavailableAfterNotFound(ctx, candidate, selectedCredential.Credential, result)
 			}
@@ -561,12 +530,7 @@ func (h Handler) forwardGatewayRequest(
 		}
 
 		result = h.handleBufferedResponse(ctx, requestID, apiKeyID, canonicalModelID, candidate, protocol, resp, result, startedAt)
-		if isGrokSite(candidate.Site.SiteType) {
-			h.markGrokCredentialSyncFailed(ctx, selectedCredential.Credential, result)
-		}
-		if isWorkBuddySite(candidate.Site.SiteType) {
-			h.markWorkBuddyCredentialSyncFailed(ctx, selectedCredential.Credential, result)
-		}
+		h.markAccountPoolAuthFailure(ctx, candidate.Site.SiteType, selectedCredential.Credential, result)
 		if !request.Diagnostic {
 			h.markCredentialModelUnavailableAfterNotFound(ctx, candidate, selectedCredential.Credential, result)
 		}
